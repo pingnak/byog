@@ -1,0 +1,35 @@
+#summary Building the project
+
+= What you will need... =
+
+To make and embed art and animations, some version of Flash.  It's possible to do this with mxmlc's 'Embed', too.  You'll need Flash CS5.5 or later to open the project fla file.
+
+You'll need Apache Ant
+
+https://ant.apache.org/
+
+You'll need Adobe AIR SDK (and compiler) 4.0 or later.
+
+https://helpx.adobe.com/air/kb/archived-air-sdk-version.html
+
+To install the AIR package, you'll need the AIR runtime.
+
+https://get.adobe.com/air/
+
+= Running = 
+
+Once installed, launch the AIR application.  Give it a port higher than 1024.  Run it.  Your OS may generate a warning about the firewall.  Allow it to listen to that port, or nobody will be able to connect.  
+
+Enter the IP:Port (e.g. http://192.168.0.50:7777).  Most browsers don't need you to type the 'http://' portion, but some do.
+
+If you're going to have more than a very few connections, you should plug the computer that's running the server into a wired connection to the router.  This will save lots of wireless bandwidth for the clients.
+
+= Building and Testing = 
+
+Once you have ant and the AIR SDK installed, and in your path, just type 'ant -p' for a list of build targets.
+
+The default 'all' target would normally make all of the sub-projects, but for now there's only the one.  This will package the app.
+
+The 'run' and 'runtrace' targets will run the release and debug version of the project, respectively, without generating an AIR package.
+
+The 'rundebug' target will build and launch the app, so it can be debugged with Adobe's fdb.
