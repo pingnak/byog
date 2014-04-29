@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Project app build
+-->
+<project basedir="." name="MXMLC Build" >
+
+	<!-- Self-signed Certificate generation -->
+	<target name="checkcert" >
+		<available property="cert.available" file="${air.certificate}" />
+	</target>
+	
+	<!-- 
+	    This will make a new .p12 file.  If you don't have one already, this makes
+	    another.  If you make a new .p12 file of your own, you may not be able to 
+	    reinstall your local modifications until you go into your /Applications
+	    folder (or 'add/remove', or whatever) and remove it, yourself.
+	-->
+	<target name="aircert" description="Build Self-Signed Certificate for AIR" unless="cert.available" depends="checkcert">
+		<sequential>
+            <echo>Cooking up a fake, self-signed development certificate...</echo>
+            <exec executable="adt" searchpath="true" vmlauncher="false" failonerror="true" >
+                <arg line="-certificate"/>
+                <arg line="-cn SelfSigned"/>
+                <arg line="-o 'videowebscript'"/>
+                <arg line="2048-RSA"/>
+                <arg line="${air.certificate}"/>
+                <arg line="${air.cert.password}"/>
+            </exec>
+		</sequential>
+	</target>
+
+	<!-- Build the worker (thread) -->
+    <target name="worker" description="Build worker thread" >
+		<sequential>
+			<macro-buildexec target="${source.dir}/com/worker/worker.swf" src="${source.dir}" main="com/worker/WorkerPack.as" debug="false" release="true" buildtype="+configname=air" />
+		</sequential>
+	</target>
+
+	<!-- AIR setup - remove aircert from the depends if you have a certificate -->
+    <target name="release" description="Build AIR Deployable Target" depends="aircert,worker,ndebug"  >
+		<sequential>
+			<echo>AIR Setup...</echo>
+			<!-- Air file mysteriously grows each time.  So delete it, first. -->
+			<delete file="./${targetname}/${targetname}.air" />
+			<exec executable="adt" searchpath="true" vmlauncher="false" failonerror="true" >
+				<arg line="-package"/>
+				<arg line="-storetype ${air.cert.type}"/>
+				<arg line="-keystore ${air.certificate}"/>
+				<arg line="-storepass ${air.cert.password}"/>
+				<arg line="./${targetname}/${targetname}.air"/>		<!-- Output file -->
+				<arg line="./${targetname}/${targetname}-app.xml"/>	<!-- AIR project info -->
+				<arg line="-C ./${targetname}"/>	            <!-- Change folder -->
+				<arg line="."/> 				            <!-- Recursively add everything in deploy -->
+				<!-- Add other files/folders to list -->
+			</exec>
+		</sequential>
+	</target>
+	
+	<!-- Build the worker (thread) debug version -->
+    <target name="workerdebug" description="Debug worker thread" >
+		<sequential>
+			<echo>${worker.swf}</echo>
+			<echo>${source.dir}</echo>
+			<echo>${worker.as}</echo>
+			<macro-buildexec target="${worker.swf}" src="${source.dir}" main="${worker.as}" debug="true" release="false" buildtype="+configname=air" />
+		</sequential>
+	</target>
+	
+	<!-- Build the debug version of the app -->
+    <target name="debug" description="Debug instrumentated build" depends="workerdebug">
+		<sequential>
+			<macro-buildexec target="${app.target}" src="${source.dir}" main="${app.main}" debug="true" release="false" buildtype="+configname=air" />
+		</sequential>
+	</target>
+
+	<!-- Build the debug version of the app -->
+    <target name="ndebug" description="Release-mode test build" depends="worker">
+		<sequential>
+			<macro-buildexec target="${app.target}" src="${source.dir}" main="${app.main}" debug="false" release="true" buildtype="+configname=air" />
+		</sequential>
+	</target>
+	
+    <!-- Pseudo-target to run a release mode test -->
+    <target name="run" description="Run AIR Target" depends="ndebug">
+		<sequential>
+			<echo>Running in AIR...</echo>
+			<exec executable="adl" searchpath="true" vmlauncher="false">
+			    <arg line="-profile desktop" />
+				<arg line="./${targetname}/${targetname}-app.xml"/>
+				<arg line="./${targetname}"/>
+			</exec>
+		</sequential>
+	</target>
+	
+    <!-- Pseudo-target to run a debug mode app with trace output -->
+    <target name="runtrace" description="Run debug target outside of debugger" depends="debug">
+
+        <!-- This is where flash hides its log file --> 
+        	<property name="flashlog" value="${env.HOME}/Library/Preferences/Macromedia/Flash Player/Logs/flashlog.txt"/>
+
+		<sequential>
+			<echo>Running debug in console...</echo>
+
+			<echo message="Trace output for ${targetname}${line.separator}" file="${flashlog}" append="false" />
+			
+		    <echo>Launching app...</echo>
+			<exec executable="adl" searchpath="true" vmlauncher="false" spawn="true" >
+			    <arg line="-profile desktop" />
+				<arg line="./${targetname}/${targetname}-app.xml"/>
+				<arg line="./${targetname}"/>
+			</exec>
+
+			<!-- Pop up a little trace window -->
+			<exec executable="tail" searchpath="true" vmlauncher="false">
+				<arg line='-F "${flashlog}"'/>
+			</exec>
+			
+			<!-- For windows, you'll need 'tail' from one of the various GNU tools packages for it.  -->
+		</sequential>
+	</target>
+	
+    <!-- 
+        Pseudo-target to launch for the debugger
+        
+        1. Start fdb in a terminal/shell
+        2. Give it the 'run' command.  It will wait for a connection
+        3. ant rundebug 
+        4. Press 'c' to continue, or set breakepoints, or whatever
+        
+        Adobe's fdb is just like gdb, only worse.
+    -->
+	<target name="rundebug" description="Build and run in debugger" depends="debug">
+		<sequential>
+		    <echo>You needed to run fdb in a shell, then type 'run', first...</echo>
+			
+		    <echo>Launching app...</echo>
+			<exec executable="adl" searchpath="true" vmlauncher="false">
+			    <arg line="-profile desktop" />
+				<arg line="./${targetname}/${targetname}-app.xml"/>
+				<arg line="./${targetname}"/>
+			</exec>
+		</sequential>
+	</target>
+
+	<!--
+		Define mxmlc invocation
+	-->
+	<macrodef name="macro-buildexec">
+		<attribute name="main"/>		<!-- The 'main' application class -->
+		<attribute name="target"/>		<!-- Where the built target goes -->
+		<attribute name="src"/>			<!-- Where the preprocessed code goes -->
+		<attribute name="debug"/>		<!-- Debug flag -->
+		<attribute name="release"/>		<!-- Complimentary Release flag -->
+		<attribute name="buildtype"/>	<!-- Air (or not) -->
+		<sequential>
+			<tstamp />
+			<echo>MXMLC @{target}...</echo>
+			<!--
+				We use the java invocation, since the 'exec' chokes on Windoze
+				'mxmlc.exe' vs 'mxmlc' on any other platform.
+			-->
+			<exec executable="mxmlc" searchpath="true" vmlauncher="false" failonerror="true" >
+				<arg line="@{buildtype}" />
+				<!-- Set conditional compile directives and constants -->
+				<arg value="-compiler.define=CONFIG::FLASH_AUTHORING,false" />
+				<arg value="-compiler.define=CONFIG::MXMLC_BUILD,true" />
+				<arg value="-compiler.define=CONFIG::DIKEOUT,false" />
+				<arg value="-compiler.define=CONFIG::DIKEIN,true" />
+				<arg value="-compiler.define=CONFIG::DEBUG,@{debug}" />
+				<arg value="-compiler.define=CONFIG::RELEASE,@{release}" />
+				<arg value="-compiler.define=CONFIG::WIDE,${app.wide}" />
+				<arg value="-compiler.define=CONFIG::HIGH,${app.high}" />
+				<arg value="-compiler.define=CONFIG::FPS,${app.framerate}" />
+				<arg value="-compiler.define=CONFIG::TIME,${DSTAMP}${TSTAMP}" />
+				
+				<!-- 
+					Every kind of warning available...
+					
+					Generated with...
+
+					mxmlc -help advanced | grep warn | grep -v change | sed 's@^\(.*\)$@<arg line="\1=true" />@'
+				-->
+                <arg line="-compiler.strict=true" />
+                <arg line="-warnings=true" />
+                <arg line="-compiler.show-actionscript-warnings=true" />
+                <arg line="-compiler.show-binding-warnings=true" />
+                <arg line="-compiler.show-multiple-definition-warnings=true" />
+                <arg line="-compiler.warn-assignment-within-conditional=true" />
+                <arg line="-compiler.warn-bad-array-cast=true" />
+                <arg line="-compiler.warn-bad-bool-assignment=true" />
+                <arg line="-compiler.warn-bad-date-cast=true" />
+                <arg line="-compiler.warn-bad-es3-type-method=true" />
+                <arg line="-compiler.warn-bad-es3-type-prop=true" />
+                <arg line="-compiler.warn-bad-nan-comparison=true" />
+                <arg line="-compiler.warn-bad-null-assignment=true" />
+                <arg line="-compiler.warn-bad-null-comparison=true" />
+                <arg line="-compiler.warn-bad-undefined-comparison=true" />
+                <arg line="-compiler.warn-class-is-sealed=true" />
+                <arg line="-compiler.warn-const-not-initialized=true" />
+                <arg line="-compiler.warn-deprecated-function-error=true" />
+                <arg line="-compiler.warn-deprecated-property-error=true" />
+                <arg line="-compiler.warn-duplicate-argument-names=true" />
+                <arg line="-compiler.warn-duplicate-variable-def=true" />
+                <arg line="-compiler.warn-import-hides-class=true" />
+                <arg line="-compiler.warn-internal-error=true" />
+                <arg line="-compiler.warn-level-not-supported=true" />
+                <arg line="-compiler.warn-missing-namespace-decl=true" />
+                <arg line="-compiler.warn-negative-uint-literal=true" />
+                <arg line="-compiler.warn-no-type-decl=true" />
+                <arg line="-compiler.warn-slow-text-field-addition=true" />
+                <arg line="-compiler.warn-unlikely-function-value=true" />
+				<!-- Set up Application preferences -->
+				<arg line="-default-size ${app.wide} ${app.high}" />
+				<arg line="-default-background-color=#${app.background.color}" />
+				<arg line="-use-network=true" />
+				<arg line="-default-frame-rate=${app.framerate}" />
+				<arg line="-default-script-limits 100 5" />
+				<!-- Set up debug/optimize -->
+				<arg line="-compiler.debug=@{debug}" /> 
+				<arg line="-compiler.optimize=@{release}" /> 
+				<!-- MAIN (must be last on list -->
+				<arg line="--source-path='@{src}'" />
+				<arg line="-o=@{target}"/>
+				<arg line="-file-specs='@{src}/@{main}'" />
+				<arg line="-target-player='${app.fullplayerversion}'" />
+				
+			</exec>
+			<echo/>
+			<echo>BUILD VERSION ${DSTAMP}${TSTAMP}</echo>
+			<echo/>
+		</sequential>
+	</macrodef>
+	
+</project>
+
