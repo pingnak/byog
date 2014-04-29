@@ -33,3 +33,15 @@ The default 'all' target would normally make all of the sub-projects, but for no
 The 'run' and 'runtrace' targets will run the release and debug version of the project, respectively, without generating an AIR package.
 
 The 'rundebug' target will build and launch the app, so it can be debugged with Adobe's fdb.
+
+= What's There = 
+
+The 'build.xml' file is the main ant build script.  The build.properties contains common properties for all sub-projects.  The 'buildapp.xml' file is the actual build script that is applied to sub-projects.
+
+The 'src' folder contains the source code.  The 'src/BugTest' contains the specific BugTest source.  The 'pingnak' folder is common code.  The 'worker' folder is for the AS3 Worker class that does the image compression in a thread.
+
+The 'BugTest.fla' is a Flash CS5.5 file that contains the art and animations that are embedded in the game as a swf, in src/BugTest/Resource.swf.
+
+The 'artistry' folder is just where I do the various transformations on things, to make some of the parts of the game.  The 'tesselate.sh' script uses ImageMagick to build the tile map for the background, and a couple of other tools to try to shrink the png files a little better.
+
+The 'BugTest' folder contains the various resources that are packaged with AIR, and ultimately the AIR file, its self.  The 'client' folder contains content that can be served to the client.  The 'server' folder contains private server configurations.  The build.properties file defines some things about BugTest, for buildapp.xml to use.
