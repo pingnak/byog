@@ -1,4 +1,5 @@
 #summary Building the project
+#labels Featured
 
 = What you will need... =
 
