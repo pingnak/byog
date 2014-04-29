@@ -37,7 +37,7 @@ The 'rundebug' target will build and launch the app, so it can be debugged with 
 
 The first time you build it, it will generate a self-signed certificate to build the app.  Don't commit this.  That's YOUR certificate, and not to be shared.
 
-= Trouble-shooting the installer =
+= Troubleshooting the installer =
 
 A few bugs I've noticed in the AIR installer.  First off, if your certificate doesn't match the previous certificate, you'll have to uninstall the previous version of the game, to install one signed by you.  AIR doesn't give you any messages about WHY.  That's just what you'll have to do.
 
