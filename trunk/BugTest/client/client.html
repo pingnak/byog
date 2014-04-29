@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en" >
+<!--
+    Classic, Dumb Raster Terminal Implementation - for modern browsers
+    
+    Browser needs RFC 6455 WebSocket and recent Webkit/Canvas/Audio Support
+    
+    http://caniuse.com/#search=WebSocket
+    http://caniuse.com/#search=Canvas
+    http://caniuse.com/#search=Audio
+    
+    Neither are finalized standards, and still subject to change... and breakage,
+    but hopefully they won't change enough to break this implementation.
+    
+    Generally speaking, I've tried to keep this simple, for a given value of 'simple'.
+    
+    There are no external dependencies for the client.  What you see here is all of it.
+    
+    The Server class cleans comments, trace/assert, etc. and extra white space up in 
+    release mode.  In that mode, looking at the client, it's a few, really long lines
+    with no code comments.
+    
+    At runtime, certain values are inserted into the code by the server, so we don't
+    wait around doing more 'configuration' on the client side.
+
+    Generally speaking...
+    
+    * The header half of the file is the krazy glue.  
+    
+    * The body half is the dumb terminal client, based on that glue.
+    
+    * We attempt to DETECT browser capabilities, rather than build an always outdated
+      database of what clients can support what.  In some cases, this leads to symptoms
+      and breakage.  It's unavoidable, whatever strategy you use.  I just elected to 
+      use the strategy that doesn't create a full-time 'keep the list updated' job.
+      
+    
+-->
+<head>
+<title>%TITLE%</title>
+<meta charset="UTF-8">
+<meta NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+<!-- IE evil http://technet.microsoft.com/en-us/library/dn321432.aspx -->
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<!-- iOS evil https://developer.apple.com/library/ios/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="favicon.png">
+<!-- 
+    Debug console helper 
+    Open http://jsconsole.com/
+    Type listen: D91C3E56-5A48-4D69-B09D-589E66FDC387 into the gray box at the very top
+    Console output will go there.
+    Type javascript commands and such, and they will bounce off the server
+<script src="http://jsconsole.com/remote.js?D91C3E56-5A48-4D69-B09D-589E66FDC387"></script>
+-->
+<!--DEBUG-->
+<!--/DEBUG-->
+
+<style type="text/css">
+/* Transparent boxes, fit into transparent boxes... all of it */
+* { margin: 0; padding: 0; }
+body {
+    background-color:#000000; 
+    color:#e0e0e0; 
+    overflow:hidden;
+}
+h1 { color:red; text-align:center; }
+h2 { color:#e0e0e0; }
+p.center { color:#e0e0e0; text-align:center; }
+a:link { color:#00ffff; text-decoration: none; }
+a:visited { color:#00f0f0; text-decoration: none; }
+a:hover { color:#00ffff; text-decoration: underline; }
+a:active { color:#20ffff; text-decoration: none; }
+.popup, #wait_container, #refresh_container
+{   /* Several instances inherit our popup properties */
+    /* http://css-tricks.com/centering-percentage-widthheight-elements/ */
+    color: #f0f0f0;
+
+    /* Stick on center of window */
+    position: absolute;
+    left: 20%;
+    width: 60%;
+
+    /* Half width+height of window - older browsers fixed position
+    top: 25%;
+    min-height: 50%;
+    */
+
+    /* Set origin to center of screen, scoot half own width/height up/left */
+    top: 50%;
+    transform: translate( 0%, -50%);           /* 'web standards' */
+    -ms-transform: translate( 0%, -50%);       /* IE 9 */
+    -webkit-transform: translate( 0%, -50%);   /* Webkit */  
+
+    /* Round the edges of our window */
+    padding:10px;
+    border-radius: 15px;
+    background-color: rgba(32,32,32,0.9);
+}
+#wait_container { z-index: 5; display:block; }
+#refresh_container { z-index: 4; display:none; }
+#game_container {
+    /*overflow: hidden;*/
+    margin:0;
+    height:100%; 
+    z-index:2;
+    display:none;
+}
+#spriteCanvas, #tileCanvas { 
+    position:absolute;
+    left:0px;
+    top:0px;
+    width:100%; 
+    height:100%;
+
+}
+#derp {
+    /* Try to let browser know not to SLOWLY turn our images into blurry smudges */
+    image-rendering:optimizeSpeed;             /* Legal fallback */
+    image-rendering:-moz-crisp-edges;          /* Firefox        */
+    image-rendering:-o-crisp-edges;            /* Opera          */
+    image-rendering:-webkit-optimize-contrast; /* Safari         */
+    image-rendering:pixelated;                 /* CSS4 Proposed  */
+    -ms-interpolation-mode:nearest-neighbor;   /* IE8+           */
+}
+#spriteCanvas {
+    z-index:3;
+}
+#tileCanvas {
+    z-index:2;
+}
+#mainAudio {
+    z-index:1;
+    display:none;
+}
+#bback, #bfull, #bmute, #bplay {
+    background: transparent;
+    border: none !important;
+    font-size:0;
+    position: absolute;
+    left:0px;
+    bottom:0px;
+    display:none;
+    z-index:9;
+}
+#bback, #bfull {
+    left:40px;
+}
+
+</style>
+
+<script type="text/javascript">
+
+// Single sample mp3: 96 bytes (*4/3)
+var silent_mp3 = "//MUxAAAAANIAAAAAExBTUUzLjk4LjJV//MUxAsAAANIAAAAAFVVVVVVVVVVVVVV//MUxBYAAANIAAAAAFVVVVVVVVVVVVVV//MUxCEAAANIAAAAAFVVVVVVVVVVVVVV";
+
+// Various sub-pages
+var wait_container;     // Waiting to load...
+var refresh_container;  // Something is borked
+var game_container;     // Game play
+
+var currentFrame = 0;   // Last received+rendered frame ID from server (for input events sent back) 
+var pendingFrame = 0;   // Server's frame ID for data sent down; becomes 'currentFrame' here when it's rendered
+var depthGaugeID = 0;   // Interval - Every so often, we send a message back to tell server what frame we're displaying
+
+var bMute = false;      // Mute button status (tells PlaySound whether to play)
+
+// Visibility API support - so we don't suck a battery dry while someone is not playing
+// http://www.w3.org/TR/page-visibility/
+var fullscreenEnabled       = document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled;
+var visibilityChange        = null; // Event ID to listen for visibility change         
+var visibilityChangeHidden  = null; // Property ID to test, to see if the app is 'hidden'
+var visibilityTimeout       = 0;    // Timeout - User has a certain amount of time to come back, before we close the connection
+
+// Web socket 
+var websock = null;
+
+// Web socket emulator 
+var xmlhttpRequest = "http://%IP%/%LONG_POLL_XML%?id=%SESSION%"; // URL to send audio to
+var xmlhttp = null;     // XML request handler 
+var xmlhttpUpload = "";
+var xmlhttpAnswer = "";
+var xmlhttpTimeout=0;
+var LongPollAnswerHandler = Dummy
+
+// Sound
+// http://www.w3schools.com/html/html5_audio.asp
+// https://dvcs.w3.org/hg/audio/raw-file/tip/webaudio/specification.html
+var PlaySound;      // Which version of sound playback function
+var audio;          // Audio object (HTML5 audio - fallback if Webkit audio not supported)
+var audiocontext;   // Webkit audio context 
+var audiosamples;   // Database of cached audio for webkit playback 
+
+// Sprites
+// http://www.w3schools.com/html/html5_canvas.asp
+// http://www.w3schools.com/jsref/dom_obj_image.asp
+var canvas;         // Where to draw sprites
+var context;        // What to draw sprites with
+var layer = null;   // ID of sprite layer to draw to
+var offX = 0;       // Offset to draw
+var offY = 0;
+var wide = 0;       // Scaling factors for sprite draw (resize canvas)
+var high = 0;
+// Pool of Image objects to receive sprite image data, decode and render it
+var imagePool;
+
+// Tiles
+var tilecanvas;     // Where to draw tiles
+var tilecontext;    // What to draw tiles with
+var tilemap = new Object(); // Database of tiles, available to render
+var tilepool = [];          // Pool of tile Image objects, to help keep leaky housekeeping to a minimum
+var tilemap_bounds = null;  // Where tiles are rendered 
+var tilemap_scale  = 1.0;   // Scaling applied to tiles, to match simulation
+var tilemap_id     = null;  // Used to discriminate tiles from sprites... 
+var tilemap_dirty  = false; // Only re-render tile map when it changes 
+
+/** Show us a generic 'it broke' message */
+function TellUsToRefresh(how)
+{
+    Shutdown();
+    SetContainer("refresh_container");
+    if( 0 != arguments.length )
+    {
+        refresh_container.innerHTML += "<br/><p>"+how+"</p>";
+        log(how);
+    }
+}
+
+/**
+ * Hide all containers, show one
+**/
+function SetContainer(id)
+{
+    wait_container.style.display="none";
+    game_container.style.display="none";
+    refresh_container.style.display="none";
+    var div = document.getElementById(id);
+    if( null != div )
+        div.style.display="block";
+    else
+        refresh_container.style.display="block";
+}
+
+/**
+ * Shut down, if we lose focus: iOS stays connected, and leaks sockets/connections
+**/
+function HandleVisibilityChange()
+{
+    if( 0 != visibilityTimeout )
+    {
+        clearTimeout(visibilityTimeout);
+        visibilityTimeout = null;
+    }
+	if(document[visibilityChangeHidden]) 
+	{
+        visibilityTimeout = setTimeout( HandleInactiveTimeout, %MS_REASONABLE_INVISIBILITY% );
+	}
+}
+function HandleInactiveTimeout()
+{
+    TellUsToRefresh("Disconnected for prolonged inactivity." );
+}
+
+/**
+ * Disable 'smoothing' on various modes of context
+**/
+function FixContext(contect)
+{
+    context['imageSmoothingEnabled'] = false;
+    context['mozImageSmoothingEnabled'] = false;
+    context['oImageSmoothingEnabled'] = false;
+    context['webkitImageSmoothingEnabled'] = false;
+    context['msImageSmoothingEnabled'] = false;
+}
+
+/**
+ * Body.onload startup function
+**/
+function Startup()
+{
+    refresh_container = document.getElementById('refresh_container');
+    wait_container = document.getElementById('wait_container');
+    game_container = document.getElementById('game_container');
+    window.onerror = HandleWindowError; 
+
+    canvas= document.getElementById('spriteCanvas');
+    if( !canvas.getContext )
+    {
+        BrowserIsAncient(); // Really, really ancient...
+        return;
+    }
+
+    imagePool = new Array();
+    var nPool = 6;
+    while( 0 < nPool-- )
+    {
+        var img = new Image();
+        img._pendingProps = {};
+        imagePool.push(img);
+    }
+    
+    // Set up sprite layer
+    context = canvas.getContext("2d");
+    FixContext(context);
+    
+    // Set up tile layer
+    tilecanvas  = document.getElementById('tileCanvas');
+    tilecontext = tilecanvas.getContext("2d");
+    FixContext(tilecontext);
+    
+    // Attempt to use Webkit audio
+    try {
+        // Fix up for prefixing
+        window.AudioContext = window.AudioContext||window.webkitAudioContext;
+        audiocontext = new AudioContext();
+        audiosamples = new Object();
+
+        // Create a silent sample for audio to 'play' when the user taps for the first time.  Because iOS.
+        // We could add more, but that's specializing.
+        //PlayAudioWebKit("crunch.mp3");
+        CacheWebkitAudioB64("%SILENT_MP3%",silent_mp3);
+
+        // If we got this far, we probably have Webkit audio.
+        PlaySound = PlayAudioWebKit;
+    }
+    catch(e) {
+        log('Webkit Audio API is not supported in this browser... using HTML5 audio.\n'+e);
+        audiocontext = null;
+        PlaySound = PlayAudio;
+    }
+    audio = document.getElementById('mainAudio');
+    
+    // Test to see if audio can be muted - muted is writable
+    bMute = false;
+    document.getElementById('bmute').style.display="block";
+    document.getElementById('bplay').style.display="none";
+    
+    if( window.WebSocket )
+    {   // Start up Modern client
+        SetContainer("wait_container");
+        
+        // Make a pool of these, or Chrome bleeds like a pig
+        websock = new WebSocket('ws://%IP%/pngstream?id=%SESSION%');
+        websock.onopen = HandleWebSockOpen; 
+        websock.onmessage = HandleWebSockMessage;
+        websock.onerror = HandleWebSockError; 
+        websock.onclose = HandleWebSockClose; 
+    }
+    else if( window.XMLHttpRequest )
+    {   // Fall back to long poll client
+        SetContainer("wait_container");
+
+        // Attempt to make do with 'long poll' mode client.  It will 'work'. 
+        // For people who own junk with planned browser+OS obsolescence built in, 
+        // and are too poor/cheap/stubborn to upgrade to something modern.
+        websock = null;
+        xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = LongPollAnswer;
+        LongPollAnswerHandler = HandleFirstLongPollAnswer;
+        LongPollRequest();
+    }
+    else
+    {
+        BrowserIsAncient();
+        return;
+    }
+
+    // Setup resize
+    if( fullscreenEnabled )
+    {
+        window.onresize = HandleResize;
+        window.onorientationchange = HandleResize;
+        setTimeout(HandleResize,100); // Chrome: Sizes we need for mouse not reported first time around
+    }
+
+    // set name of visibilityChangeHidden property and visibility change event
+    if(typeof document.hidden !== "undefined") {
+        visibilityChangeHidden = "hidden";
+        visibilityChange = "visibilitychange";
+    } else if(typeof document.mozHidden !== "undefined") {
+        visibilityChangeHidden = "mozHidden";
+        visibilityChange = "mozvisibilitychange";
+    } else if(typeof document.msHidden !== "undefined") {
+        visibilityChangeHidden = "msHidden";
+        visibilityChange = "msvisibilitychange";
+    } else if(typeof document.webkitHidden !== "undefined") {
+        visibilityChangeHidden = "webkitHidden";
+        visibilityChange = "webkitvisibilitychange";
+    } else {
+        log("No visibility API");
+        return;
+    }
+    document.addEventListener(visibilityChange, HandleVisibilityChange, false);
+    // Make sure we close the socket, even if the browser 'forgets'.
+    window.onbeforeunload = Shutdown;
+}
+
+/** Tell us about your old, old browser */
+function BrowserIsAncient()
+{
+    TellUsToRefresh('Your web browser is too old.<br/><a href="http://en.wikipedia.org/wiki/Planned_obsolescence#Planned_obsolescence_in_software">Planned obsolescence?</a>');
+}
+
+/** Catch errors, and tell us about how we broke it */
+function HandleWindowError(msg, url, line) 
+{
+    TellUsToRefresh("Error: "+msg+": "+url+":"+line);
+}
+
+/** Socket open event */
+function HandleWebSockOpen( evt ) 
+{
+    // Set up watchdog for stale refresh flooding 
+    depthGaugeID = setInterval(DepthGaugePing,%PING_FREQUENCY%);
+    DepthGaugePing();
+    EnableUI();
+}
+
+/** Socket close event */
+function HandleWebSockClose( evt ) 
+{
+    TellUsToRefresh("Connection Closed " + evt.reason);
+}
+
+/** Handle what comes down from the server */
+function HandleWebSockMessage( evt ) 
+{
+    if( 'string' == typeof( evt.data ) )
+        HandleWebSockMessageTxt( evt.data );
+    else
+        HandleWebSockMessageBin( evt.data );
+    // Dereference trying to decide where data is leaking.  
+    evt.stopPropagation();
+    evt.data = null;    
+}
+
+/** Handle binary message from WebSocket... not supported  */
+function HandleWebSockMessageBin( data )
+{
+    trace("Received: "+data);
+    data = null;
+}
+
+/** Socket error event */
+function HandleWebSockError()
+{
+    TellUsToRefresh('WebSocket Error');
+}
+
+/** Socket close event */
+function HandleWebSockClose( evt ) 
+{
+    TellUsToRefresh("Connection Closed "+evt.reason);
+}
+/**
+ * Periodically POLL for long poll frames.
+ * This gives us effectively 'two way' communications, but it's less efficient.
+**/
+function LongPollRequest()
+{
+    // Send inputs as part of ?param spew
+    if( 0 != xmlhttpTimeout )
+        clearTimeout(xmlhttpTimeout);
+    xmlhttpTimeout = 0;
+    if( 0 == xmlhttp.readyState || 4 == xmlhttp.readyState )
+    {
+        DepthGaugePing();
+        xmlhttp.open("GET",xmlhttpRequest+xmlhttpUpload,true);
+        //xmlhttp.setRequestHeader("Content-Type", "text/plain;charset=UTF-8" );
+        xmlhttp.send();
+        xmlhttpUpload = "";
+    }
+    else
+    {
+        xmlhttpTimeout = setTimeout(LongPollRequest,10);
+    }
+}
+
+/**
+ * Handle long poll answer, which we use the 'old fashioned' http request 
+ * for, because this supports 'old' browsers.  The 'new' http request code
+ * for onload and onerror is exactly as standardized as WebSockets, which 
+ * is to say, NOT.
+**/
+function LongPollAnswer()
+{
+    // 4:Done
+    //trace( "LongPollAnswer:"+xmlhttp.readyState+','+xmlhttp.status );
+    if( 4 == xmlhttp.readyState )
+    {
+        // HTTP status = 200:OK
+        if( 200 == xmlhttp.status )
+        {
+            // Immediately set about getting the next one, even before we process.
+            xmlhttpAnswer = xmlhttp.responseText;
+            setTimeout(LongPollAnswerHandler,1);
+        }
+        else
+        {
+            TellUsToRefresh("Connection closed: "+xmlhttp.status);
+        }
+    }
+}
+
+/** First response from long poll enables UI. */
+function HandleFirstLongPollAnswer()
+{
+    HandleLongPollAnswer();
+    EnableUI();
+    LongPollAnswerHandler = HandleLongPollAnswer;
+}
+/** Handle long poll data like websockets data, kinda-sorta */
+function HandleLongPollAnswer()
+{
+    // Fire off next request, before parsing our response
+    LongPollRequest();
+
+    // Parse as newline terminated list of commands.
+    // XML was too heavy for this.
+    var iStart = 0;
+    var iEnd = 0;
+    var id;
+    var curr;
+    while( iStart < xmlhttpAnswer.length ) 
+    {
+        id = xmlhttpAnswer.slice(iStart,iStart+4);
+        iEnd = xmlhttpAnswer.indexOf('\n',iStart);
+        if( iEnd < iStart )
+            iEnd = xmlhttpAnswer.length;
+        //trace("*("+id+')'+iStart+'-'+iEnd+'/'+xmlhttpAnswer.length);
+        curr = xmlhttpAnswer.slice(iStart,iEnd);
+        iStart = iEnd + 1;
+        HandleWebSockMessageTxt(curr);
+        curr = null;
+    }
+    xmlhttpAnswer = "";
+}
+function Dummy() {}
+
+/** Ensure client is fully inert */
+function Shutdown()
+{
+    // Stop long poll from carrying on after an error happens
+    currentFrame = 0;
+    canvas.onmousedown = null;
+    canvas.ontouchstart = null;
+    canvas.onkeypress = null;
+    if( null != websock )
+    {
+        websock.onclose = null;
+        websock.close();
+        websock = null;
+    }
+    if( 0 != depthGaugeID )
+    {
+        clearInterval( depthGaugeID );
+        depthGaugeID = null;
+    }
+    if( 0 != xmlhttpTimeout )
+    {
+        clearTimeout(xmlhttpTimeout);
+        xmlhttpTimeout = 0;
+    }
+    LongPollAnswerHandler = Dummy;
+    if( null != visibilityChange )
+    {
+        document.removeEventListener(visibilityChange, HandleVisibilityChange);
+        if( 0 != visibilityTimeout )
+        {
+            clearTimeout(visibilityTimeout);
+            visibilityTimeout = null;
+        }
+    }
+    ClearTiles();
+}
+
+/** Prevent scrolling and other badness on tablets */
+function EatEvent(event) 
+{
+    event.stopPropagation(); 
+    event.preventDefault();
+}
+
+/** Mute button pressed */
+function audioMute()
+{
+    document.getElementById('bmute').style.display="none";
+    document.getElementById('bplay').style.display="block";
+    bMute=true;
+}
+/** Un-mute button pressed */
+function audioPlay()
+{
+    document.getElementById('bmute').style.display="block";
+    document.getElementById('bplay').style.display="none";
+    bMute=false;
+}
+/** Full screen API - attempt to enter full screen mode */
+function launchFullscreen() 
+{
+    //element = game_container; would be more accurate, but Firefox chokes... BADLY
+    var element = document.documentElement;
+    if(element.requestFullscreen) 
+    {
+        element.requestFullscreen();
+    }
+    else if(element.mozRequestFullScreen) 
+    {
+        element.mozRequestFullScreen();
+    } 
+    else if(element.webkitRequestFullscreen) 
+    {
+        element.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+    }
+}
+/** Exit full screen mode */
+function exitFullscreen() 
+{
+    if(document.exitFullscreen) 
+    {
+        document.exitFullscreen();
+    }
+    else if(document.mozCancelFullScreen) 
+    {
+        document.mozCancelFullScreen();
+    } 
+    else if(document.webkitExitFullscreen) 
+    {
+        document.webkitExitFullscreen();
+    }
+}
+/** Update full screen buttons **/
+function HandleResize() 
+{
+    // Scale the canvas as big as possible
+    if( fullscreenEnabled )
+    {   // Keep our full screen button in the right mode.
+        var bNotFullScreen = !document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement; 
+        if( bNotFullScreen )
+        {
+            document.getElementById('bback').style.display="none";
+            document.getElementById('bfull').style.display="block";
+        }
+        else
+        {
+            document.getElementById('bback').style.display="block";
+            document.getElementById('bfull').style.display="none";
+        }
+    }
+}
+
+</script>
+</head>
+
+<body onload="Startup();" ontouchmove="EatEvent(event);" >
+<!-- I would love to use img.name{} css, but firefox is broken, and I would rather have working. visible buttons -->
+<button id="bmute" type="button" alt="Mute" onclick="javascript: audioMute(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEUAAAD////////////////////////////////////////////////////////////MzMwA//////8AAADy8vJmZmYMDAylpaXf39/S0tL7+/szMzO/v79/f3/V1dXv7+8ZGRkA7+/19fWysrJMTEw/Pz9ycnJZWVnb29uMjIwAb28Av78AHx+ZmZnPz88APz8Af3/o6OgALy8ADw/l5eUAj48A39/Y2Nji4uImJibr6+v4+PgAX18uIjDuAAAAEHRSTlMAn88fb39fv98Pjz/vry9P4hZ5IQAAAY9JREFUOI21U9l2glAMvIogbjVcNgVURHGptWqtVdv+/3c1CXgB9bXzAOcwQzLZhCigGTrD0MQTtBqmVDAbrXse6cllDIzxxZGmUaFf6vIwhBKGE9krBdG6yRnusArqRfr6z3uFHF19TCRrN0EvGJfIGB+uFwEMpJ7xfTko+OXRplc6x8en7HCC7kTRUfjxxYKZh0kgMblAqfz78e/UsrNIFOIsqVjTUem9k2WRYL4G36MvCVbyohwsjxsrE4yuADHlGEgNM1CJI9fF9FYuAG8G6Zr6JRuiFtDf9n5/mlpKkI7Adel70BZNtmBbCiRANhM4zf8SoIdwnQvamcnd7rVkEvvIZZLJrEx/uw3fNjfBOsZeQ15m0aiFx0GokwtwqdXcKGGqWc04CM8i4mGBQ9PSi2FxEBYsU3qOeVjlcVMQEmxpYfIAQhhyVShggRvlh8znC3O3cuwgyhzqammDATzgUCytaNXkg+IbW1BCTSbVw0lk9bREH09PeV3h6XWeHq/DwOM1Ho6Xo7SbjHb57z+Fkj4Y/Z6SiQAAAABJRU5ErkJggg==" /></button>
+<button id="bplay" type="button" alt="Play" onclick="javascript: audioPlay(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAA/FBMVEUAAAD////////////////////////////////////////////////////////////MzMwA////////AADy8vLff38AAADrTEzf39/S0tL7+/v1JibVpaWfX1/7DAzv7+/V1dXPv79fn5/19fUzMzMA7+/b29sZGRnPz88AHx/l5eXo6OjoWVnY2Nh/f3/i4uJycnKlpaUALy8Af38APz+ZmZlmZmYMDAwAj48Ab29ZWVnlZmYADw/r6+vvPz8A39/4+PiysrK/v78AX1+fPz9ff3+sTExfb2+4GRmfHx8Av7+fAAAPAADPAADPLy/vDw8vAADvAAAP7+9fAAAbMRMJAAAAEHRSTlMAn88fb39fv98Pjz/vr08vyllz3gAAAaRJREFUOMt9k+d6gjAUhuNCtNaeBATFWqmA1rqrrd1773H/99LkMALq4/cHyPeS5CxCpDJKDqVkyAoVsiqLpGYLiz63myMbUPZIZ6qSsLfSrFeDmGpNthnbJFNyBrCgtpWWx6ev92BJNkuFwKZlm5Vwfdjxn/2zKsv5fplVoa8FxOm5gU+TL+yzDTyg1AwWAG7dgysDok9HxQBZLVyadO48akQ+DJgIVtUh2PRxfkypAMzwQIdHssVv4OtZe6IIRD5UWYafIEIcHh25Bw2tJQDpQ41lScoSb8Z0euxRJN6kD2AVSR6vYFAUJxpxH/R8EuCE9gfrgJb29b0OaGmNz5/tJFD0LzmbnXjCp78fO9uJS/phTg4P3e4D9yl9r0tChCkTda+9eCIPu5IQiSJq0/+oaKbbfRWZlIQuqpXzi8V9gPH8xOO1CAkbi+WXG32AG7crqhkQuAEhCmuHPtcYOwqJoGGw5ermQkfu1i+jluNNa1WXm7Ynm5YUUmyJuOApiCnFnOTgOCw5WqTMR68dDQ0fvY2Vw6uj+PAqhVUDXi7mUcX43/8Lt0LLVkEZYAAAAABJRU5ErkJggg==" /></button>
+<button id="bfull" type="button" alt="Full" onclick="javascript: launchFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAh1BMVEUAAAD////////////////////////////////////////////////////////////MzMwAAABmZmb////y8vKZmZnf39/S0tK/v7/7+/vv7+/V1dVycnIzMzP19fWlpaXb29t/f38MDAzPz8/l5eXo6OgZGRnY2Nji4uKysrI/Pz/r6+v4+Ph2iCexAAAAEHRSTlMAn88fb39fv98Pjz+v708vIdemIwAAATNJREFUOMu9k9ViwzAMRR2GkmKFubS22/7/+yY74EDhbefNuTeSLWBMYdiWxDbYEzzTxRHX9JY6yfm9AElxD9G1Z/JBx2sCE5Ict5Mgxq6+wYI201V6/fcMKwrUBsM2K9KS86MSj5yXaYxWp+8xhjIgmkFPxYnDBTcywS4H4MEyAxmgduUDMXlluKF4rBuKpCeA72CkAvgq6XNNLznQDfp/Kt5TDfFiNCjDeRK0Y0yYoMm0DF4bIPOZE74zhM5/GPxPl/z4zK5QabMsVJP2hWIu9Yq6ScVVpabCn0S8UHTLet2sQjarb3cUPZT6iCJhkAEYs7F9OzDdyEWEiiBOauRoaLMYVlzV0DJPw5Xjh0owQcN6vjg1zleL7Wn12kFuafU2T5c3lNDy2qvllVF8R+JP//4Dk+I28wchU68AAAAASUVORK5CYII=" /></button>
+<button id="bback" type="button" alt="Back" onclick="javascript: exitFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAjVBMVEUAAAD////////////////////////////////////////////////////////////MzMwAAACZmZn///8zMzNmZmby8vLf39/S0tL7+/vV1dXv7+/19fXb29u/v7+ysrI/Pz/Pz8+lpaV/f39ycnLi4uLY2Njo6Ojl5eUMDAwZGRmMjIzr6+v4+PgmJia8QUr3AAAAEHRSTlMAn88fb39fv98Pjz+vL0/vKxzy0wAAAUJJREFUOI2Vk9dyg0AMRZde3ARi6WAbsB2n/f/nRSws3cnkvrAzOqiLsVGaaQiZGtuQo9s4yNadpZ3M2S0FofQWom3OzAcVHzFMFGe4nzjRTvkdFioSdQyvfl2XdgqEigT2SXrmS9UQodHZjxjBxVvJhzfciQCnDCAIFgF8AiC3RYEYvwLu2BZrh9ABbRgOUL57XtABkFMlB8qgA7yA8w96cx54PRChRhGuEuDSP5dAjDpTEuiB5wA0EoDEZVYogaqUQFlJILQmwLqK/wJ1Ja3nZgK4Q5IbVbRJ/lnmvFFnetfzRjE76wFqsXehGunz7IGwnZbxelipGFY37m9/rqYFhAPGTCx+XZhu5fyVxpWjpU0iWOkxLi1zFFwRn9SCiRTM54eT4/y02JFOr5Dmgk5vt3m8oRAdr7k6XuHFtYTc6d8/cHY4TyWtZDAAAAAASUVORK5CYII=" /></button>
+
+<!-- div layer for game -->
+<div id="game_container">
+    <audio id="mainAudio" autoplay="true" >
+    </audio>
+    <canvas id="spriteCanvas" ></canvas>
+    <canvas id="tileCanvas" ></canvas>
+</div>
+<!-- div layer for startup (should almost never be seen) -->
+<div id="wait_container">
+    <h1>Please wait...</h1>
+</div>
+<!-- div layer after disconnect -->
+<div id="refresh_container">
+    <h1>SOMETHING BROKE</h1>
+    <br/>
+    <p class="center"><input type="button" value="Refresh" onclick="javascript:location.reload(); return false;"/> the browser to reload, and try again.</p>
+    <br/>
+</div>
+
+<!-- Bring the meat of our dumb terminal into one place -->
+<script type="text/javascript">
+
+function EnableUI()
+{
+    // Hide 'wait' screen
+    SetContainer("game_container");
+
+    // Enable mouse+keyboard inputs
+    game_container.onmousedown = HandleFirstMouseDown;
+    game_container.ontouchstart = HandleFirstTouch;
+    window.onkeypress = HandleKeyPress;
+}
+
+
+/** Handle text message from WebSocket (or emulated as long ping) */
+function HandleWebSockMessageTxt( str ) 
+{
+    var top = str.substr(0,4);
+    var asplit;
+    var key;
+    var img;
+    var i;
+    switch( top )
+    {
+    case "tile": // Sprite layer
+        var s = str.substr(5,4);
+        switch(s)
+        {
+        case "tile":
+            // Remember a tile
+            tilemap_id = str.substr(10);
+            // Next message will be image
+            break;
+        case "free":
+            // Forget tile(s)
+            asplit = str.substr(10).split(";");
+            while( 0 < asplit.length )
+            {
+                RemoveTile(asplit.shift());
+            }
+            break;
+        case "posn":    // Set up tile map scale+position
+            asplit = str.substr(10).split(",");
+            tilemap_bounds = {};
+            tilemap_bounds.x = parseInt(asplit.shift());
+            tilemap_bounds.y = parseInt(asplit.shift());
+            tilemap_bounds.w = parseInt(asplit.shift());
+            tilemap_bounds.h = parseInt(asplit.shift());
+            tilemap_scale  = parseFloat(asplit.shift());
+            tilemap_dirty = true;
+            break;
+        case "nuke":
+            ClearTiles();
+            break;
+        default:
+            trace("Unhandled tile:"+s);
+            break;
+        }
+        break;
+    case "layr": // Sprite layer
+        asplit = str.split(",");
+        layer = asplit[1];
+        pendingFrame = parseInt(asplit[2]);
+        offX = parseInt(asplit[3]);
+        offY = parseInt(asplit[4]);
+        wide = parseInt(asplit[5]);
+        high = parseInt(asplit[6]);
+        break;
+    case "data":
+        var s = str.substr(5,5);
+        switch( s )
+        {
+        case "image":
+            if( null == tilemap_id )
+            {
+                DrawImage(str,layer,pendingFrame,offX,offY,wide,high);
+                offX = offY = wide = high = pendingFrame = 0;
+                layer = null;
+            }
+            else
+            {
+                AddTile(tilemap_id,str);
+                tilemap_id = null;
+            }
+            break;
+        case "audio":
+            PlaySound(str);
+            break;
+        default:
+            trace("Unhandled resource level:"+evt.data);
+            break;
+        }
+        break;
+    case "err:": // Error emulator in
+        TellUsToRefresh(str.slice(4));
+        break;
+    default:
+        TellUsToRefresh("Unhandled top level:"+evt.data);
+        break;
+    }
+    str = null;
+}
+
+/** Build a context to load image and draw it at the right position */
+function DrawImage(data,layer,pendingFrame,offX,offY,wide,high)
+{
+    // Skip frames if crummy browser is slow, unpacking things
+    var image = imagePool.shift();
+    
+    assert( null != image );
+    if( null == image )
+        return;
+
+    image._pendingProps.layer = layer;
+    image._pendingProps.pendingFrame = pendingFrame;
+    image._pendingProps.offX = offX;
+    image._pendingProps.offY = offY;
+    image._pendingProps.wide = wide;
+    image._pendingProps.high = high;
+        
+    //image.onerror = HandleWindowError;
+    image.onload = ImageLoaded.bind(image);
+
+    // This onload should almost always insta-trigger... ALMOST
+    image.src = data;
+    data = null;
+}
+
+function ImageLoaded() 
+{   
+    // Though this looks like an extra step, a few mobile browsers implement 
+    // drawing png to canvas substantially faster than drawing within DOM.
+    if( canvas.width != this._pendingProps.wide || this._pendingProps.height != high )
+    {   // If image size changes, change canvas and re-center window contents
+        canvas.width = this._pendingProps.wide;
+        canvas.height = this._pendingProps.high;
+    }
+    else
+    {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    //trace(layer+','+pendingFrame+','+offX+','+offY+','+wide+','+high);
+    context.drawImage(this,this._pendingProps.offX,this._pendingProps.offY);
+    currentFrame = this._pendingProps.pendingFrame;
+    this.onload = null;
+    this.onerror = null;
+    this.src="";
+    imagePool.push(this);
+    DrawTileMap();
+}
+    
+/** Add a tile to the tile database */
+function AddTile(id,data)
+{
+    //trace("AddTile:"+tilemap_id);
+    var img = tilepool.shift();
+    if( null == img )
+        img = new Image();
+    img.src = data;
+    tilemap[id] = img;
+}
+
+/** Remove a tile from the tile database */
+function RemoveTile(key)
+{
+    var img = tilemap[key];
+    if( undefined !== img )
+    {
+        img.src="";
+        tilepool.push(img);
+        img = null;
+    }
+    delete tilemap[key];
+}
+
+/** Clear the tile database */
+function ClearTiles()
+{
+    // Clear tile map contents
+    var adestroy = [];
+    for( key in tilemap ) 
+    {
+        img = tilemap[key];
+        if( null != img )
+        {
+            img.src="";
+            tilepool.push(img);
+        }
+        adestroy.push(key);
+    }
+    while( 0 < adestroy.length )
+    {
+        delete tilemap[adestroy.shift()];
+    }
+    tilemap_bounds = null;
+}
+
+/** Refresh tile layer */
+function DrawTileMap()
+{
+    if( !tilemap_dirty || null == tilemap_bounds )
+        return;
+    if( tilecanvas.width != tilemap_bounds.w || tilecanvas.height != tilemap_bounds.h )
+    {   // If image size changes, change tilecanvas and re-center window contents
+        tilecanvas.width = tilemap_bounds.w;
+        tilecanvas.height = tilemap_bounds.h;
+    }
+    else
+    {
+        tilecontext.clearRect( 0, 0, tilecanvas.width, tilecanvas.height );
+    }
+    
+    var left = -Math.floor(tilemap_bounds.x % %TILE_WIDE%);
+    var top  = -Math.floor(tilemap_bounds.y % %TILE_HIGH%);
+    var tx   = tilemap_bounds.x + left;
+    var ty   = tilemap_bounds.y + top;
+    var right= Math.ceil( (tx + tilemap_bounds.w + %TILE_WIDE%) / %TILE_WIDE% ) * %TILE_WIDE%;
+    var bottom=Math.ceil( (ty + tilemap_bounds.h + %TILE_HIGH%) / %TILE_HIGH% ) * %TILE_HIGH%;
+    
+    var row;
+    var col;
+    var id;
+    var tile;
+    var xCurr = left;
+    var yCurr = top;
+    for( row = ty; row < bottom; row += %TILE_HIGH% )
+    {
+        xCurr = left;
+        for( col = tx; col < right; col += %TILE_WIDE% )
+        {
+            id = col+','+row;
+            tile = tilemap[id];
+            if( undefined !== tile && tile.complete )
+            {
+                tilecontext.drawImage(tile,xCurr,yCurr);
+            }
+            xCurr += %TILE_WIDE%;
+        }
+        yCurr += %TILE_HIGH%;
+    }
+    tilemap_dirty = false;
+}
+
+/** Build a context to play a sound */
+function PlayAudio(data)
+{   // This onload should almost always insta-trigger... ALMOST
+    if( bMute )
+        return;
+    var asplit = data.split(",");
+    audio.setAttribute("src","http://%IP%/"+asplit[2]+"?id=%SESSION%");
+    audio.setAttribute("type",asplit[1]);
+    audio.load();
+    audio.play();
+}
+
+/** Use WebKit audio to play a sound - caching and mixing works on tablets and such */
+function PlayAudioWebKit(data)
+{
+    if( bMute )
+        return;
+    var asplit = data.split(",");
+    data = null;
+    var type = asplit[1];
+    var src = asplit[2];
+
+    if( PlayCachedAudioWebKit(src) )
+        return;
+    
+    var request = new XMLHttpRequest();
+    request.open('GET', "http://%IP%/"+src+"?id=%SESSION%", true);
+    request.responseType = 'arraybuffer';
+    request.onload = function() 
+    {
+        audiocontext.decodeAudioData(request.response, decoded);
+        request.response = null;
+    };
+    function decoded(buffer) 
+    {
+        audiosamples[src] = buffer;
+        PlayCachedAudioWebKit(src);
+        if( "cache" != audio.setAttribute("type",asplit[3]) )
+        {   // If we're not supposed to cache it, delete it when we're done
+            // For instance, some NPC says something that's supposed to happen as a special event
+            delete audiosamples[src];
+        }
+    }
+    request.send();
+}
+
+/** Turn a base 64 string into audio data reference */
+function CacheWebkitAudioB64(id,b64String)
+{
+    var data = atob(b64String);
+    var length = data.length;
+    var atob_abuf = new ArrayBuffer(length);
+    var atob_array = new Uint8Array(atob_abuf);
+    while( 0 < length-- ) 
+    { 
+        atob_array[length] = data.charCodeAt(length);
+    }
+    b64String = atob_array = data = null;
+    audiocontext.decodeAudioData(atob_abuf, decoded);
+    atob_abuf = null;
+    function decoded(buffer) 
+    {
+        audiosamples[id] = buffer;
+        buffer = null;
+    }
+}
+
+/** Try to play a cached sample.  Return true if we played it. */
+function PlayCachedAudioWebKit(src)
+{
+    if( null == audiocontext )
+        return false;
+    if( !audiosamples.hasOwnProperty(src) )
+        return false;
+    var bs = audiocontext.createBufferSource();
+    bs.buffer = audiosamples[src];
+    bs.connect(audiocontext.destination);
+    bs.start = bs.start || bs.noteOn;
+    bs.start(0);
+    return true;
+}
+
+/** Tell server what frame it's displaying */
+function DepthGaugePing()
+{
+    var frame = "frame,"+currentFrame+","+Date.now()+','+window.innerWidth+','+window.innerHeight;
+    if( null != websock)
+    {
+        websock.send( frame );
+    }
+    else
+    {
+        xmlhttpUpload += '&'+frame;
+    }
+}
+
+/** Handle key press */
+function HandleKeyPress(evt) 
+{   // Why is this so... bad? http://unixpapa.com/js/key.html
+    var char = 0;
+    if( 'which' in evt && 0 != evt.which )
+        char = evt.which;
+    else if( 'keyCode' in evt && 0 != evt.keyCode )
+        char = evt.keyCode;
+    else
+        return;
+    var key = "key,"+currentFrame+","+char+","+evt.shiftKey+","+evt.ctrlKey;
+    if( null != websock )
+        websock.send(key);
+    else
+        xmlhttpUpload += '&'+key;
+    return false;
+}
+
+/** Handle touch */
+function HandleTouchStart(evt)
+{
+    evt.stopPropagation(); 
+    evt.preventDefault();
+    var touch = evt.touches[0];
+    var scale = canvas.width/window.innerWidth;
+    var mx = touch.clientX*scale;
+    var my = touch.clientY*scale;
+    var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
+    trace(click);
+    if( null != websock)
+    {
+        websock.send(click);
+    }
+    else
+    {
+        xmlhttpUpload += '&'+click;
+    }
+}
+
+/** Capture first 'touch', to give audio permission to play */
+function HandleFirstTouch(evt)
+{
+    if( !PlayCachedAudioWebKit("%SILENT_MP3%") )
+    {
+        PlaySound = PlayAudio;
+        PlaySound("%SILENT_MP3%");
+    }
+    canvas.onmousedown = HandleMouseDown;
+    canvas.ontouchstart = HandleTouchStart;
+    HandleTouchStart(evt);
+}
+
+/** Handle click */
+function HandleMouseDown(evt) 
+{
+    // http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-MouseEvent
+    var scale = canvas.width/window.innerWidth;
+    var mx = evt.clientX*scale;
+    var my = evt.clientY*scale;
+    var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
+    trace(click);
+    if( null != websock)
+    {
+        websock.send(click);
+    }
+    else
+    {
+        xmlhttpUpload += '&'+click;
+    }
+    return false;
+}
+
+/** Capture first 'click', to give audio permission to play */
+function HandleFirstMouseDown(evt)
+{
+    if( !PlayCachedAudioWebKit("%SILENT_MP3%") )
+    {
+        PlaySound = PlayAudio;
+        PlaySound("%SILENT_MP3%");
+    }
+    canvas.onmousedown = HandleMouseDown;
+    canvas.ontouchstart = HandleTouchStart;
+    HandleMouseDown(evt);
+}
+
+</script>
+
+</body>
