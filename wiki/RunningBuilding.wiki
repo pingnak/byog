@@ -35,6 +35,14 @@ The 'run' and 'runtrace' targets will run the release and debug version of the p
 
 The 'rundebug' target will build and launch the app, so it can be debugged with Adobe's fdb.
 
+The first time you build it, it will generate a self-signed certificate to build the app.  Don't commit this.  That's YOUR certificate, and not to be shared.
+
+= Trouble-shooting the installer =
+
+A few bugs I've noticed in the AIR installer.  First off, if your certificate doesn't match the previous certificate, you'll have to uninstall the previous version of the game, to install one signed by you.  AIR doesn't give you any messages about WHY.  That's just what you'll have to do.
+
+Also, I've noticed that it's sensitive to WHERE the AIR package was installed from, previously.  The AIR installer likes to hang if I download it into another folder, and attempt to install it, but launching the same package from the same folder it was previously installed from... works.
+
 = What's There = 
 
 The 'build.xml' file is the main ant build script.  The build.properties contains common properties for all sub-projects.  The 'buildapp.xml' file is the actual build script that is applied to sub-projects.
@@ -46,3 +54,7 @@ The 'BugTest.fla' is a Flash CS5.5 file that contains the art and animations tha
 The 'artistry' folder is just where I do the various transformations on things, to make some of the parts of the game.  The 'tesselate.sh' script uses ImageMagick to build the tile map for the background, and a couple of other tools to try to shrink the png files a little better.
 
 The 'BugTest' folder contains the various resources that are packaged with AIR, and ultimately the AIR file, its self.  The 'client' folder contains content that can be served to the client.  The 'server' folder contains private server configurations.  The build.properties file defines some things about BugTest, for buildapp.xml to use.
+
+= Linux = 
+
+Well, shortly after starting into this project, it turned out that Adobe ended Linux support after AIR 2.6.  Another huge shotgun blast to the foot on their part, but they've never been known to be smart about anything.  The Unity version certainly WILL run under Linux, as that will be part of the Steam OS support.
