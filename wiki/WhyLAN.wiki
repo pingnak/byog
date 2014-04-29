@@ -1,4 +1,5 @@
 #summary Why would you want an intranet/LAN game server?
+#labels Featured
 
 = Introduction =
 
