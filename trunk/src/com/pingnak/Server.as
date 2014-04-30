@@ -359,20 +359,20 @@ package com.pingnak
             const rxAssert : RegExp = new RegExp("\([^A-Za-z0-9_.]\)assert\((.*?)\);","igx");
             
             // Wrap console.log in error trap, mainly because of rude browsers that don't provide 'console', unless debugger is up 
-            iteration = iteration.replace(rxLog,   '$1{ try {console.log($2);} catch(e){} }');
+            iteration = iteration.replace(rxLog,   '$1{ try {console.log$2;} catch(e){} }');
             
 CONFIG::DEBUG {
             // Turn on proper debug instrumentation
-            iteration = iteration.replace(rxTrace,   "$1{ try {console.log($2);} catch(e){} }");
+            iteration = iteration.replace(rxTrace,   "$1{ try {console.log$2;} catch(e){} }");
 
             // Assert will quietly fail, without the debugger present 
-            iteration = iteration.replace(rxAssert,  "$1{ if( !($2) ) { try { console.log('Assertion Failed: $2' ); console.log((new Error()).stack); debugger; } catch(e) {} } }");
+            iteration = iteration.replace(rxAssert,  "$1{ if( !$2 ) { try { console.log('Assertion Failed: $2' ); console.log((new Error()).stack); debugger; } catch(e) {} } }");
 }
             
 CONFIG::RELEASE {            
             // Remove debug instrumentation 
-            iteration = iteration.replace(rxTrace, '$1/* trace($2); */');
-            iteration = iteration.replace(rxAssert,'$1/* assert($2); */');
+            iteration = iteration.replace(rxTrace, '$1/* trace$2; */');
+            iteration = iteration.replace(rxAssert,'$1/* assert$2; */');
 }
 
 CONFIG::RELEASE {            

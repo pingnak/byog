@@ -1,3 +1,4 @@
+
 package com.pingnak
 {
     import flash.geom.*;
@@ -97,7 +98,7 @@ package com.pingnak
             var cframe : ClickMapFrame = aFrames[frame];
             if( null != cframe )
             {
-trace("ClickedOn", frame, ptio );
+CONFIG::DEBUG { trace("ClickedOn", frame, ptio ); }
                 return cframe.ClickedOn(ptio);
             }
             else

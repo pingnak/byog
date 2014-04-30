@@ -189,24 +189,13 @@ package com.BugTest
         **/
         override public function WSReceivedTextMessage( cc : ClientConnection, str : String ) : Boolean
         {
-            //trace("WSReceivedTextMessage:",str);
             DoomsDayPostpone();
             var aParts : Array = str.split(',');
+            CONFIG::DEBUG { if( "frame" != aParts[0] ) trace("WSReceivedTextMessage:",str); }
             var wide : int;
             var high : int;
             switch(aParts.shift())
             {
-            case "click":
-                Click(uint(aParts[0]),parseFloat(aParts[1]),parseFloat(aParts[2]),utils.parseBoolean(aParts[3]),utils.parseBoolean(aParts[4]));
-                break;
-
-            case "key":
-                aParts.shift();
-                clientFrame = uint(aParts.shift());
-                Key(clientFrame,aParts);
-                // 1..length-1 array members are keypresses
-                break;
-                
             case "frame":   // Just sending frame number to track lag
                 clientFrame = int(aParts[0]);
                 clientReceptionTime = Number(aParts[1]);
@@ -249,6 +238,17 @@ package com.BugTest
                 }
                 break;
 
+            case "click":
+                Click(uint(aParts[0]),parseFloat(aParts[1]),parseFloat(aParts[2]),utils.parseBoolean(aParts[3]),utils.parseBoolean(aParts[4]));
+                break;
+
+            case "key":
+                aParts.shift();
+                clientFrame = uint(aParts.shift());
+                Key(clientFrame,aParts);
+                // 1..length-1 array members are keypresses
+                break;
+                
             default:
                 WSSendError( cc, "No such command.",1003);
                 return false;
@@ -481,7 +481,7 @@ package com.BugTest
         **/
         public function Click( frame : int, x:Number, y:Number, shift:Boolean, ctrl:Boolean ) : void
         {
-            //trace("Click("+serverFrame+"):",frame,x,y,shift,ctrl);
+            trace("Click("+serverFrame+"):",frame,x,y,shift,ctrl);
             
             // Use the way-back machine map to find out what the user clicked on
             var ptio : Point = new Point(x,y);
