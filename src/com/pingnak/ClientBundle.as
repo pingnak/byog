@@ -163,13 +163,14 @@ CONFIG::DEBUG { debug.Trace("ClientBundle.RemoveClient:"+cc.SESSION); }
                 return;
             delete cb.clients[cc];
             cc.SESSION = "";
-            if( cb.main == cc && cb.bWsMode )
+            if( cc.bWsMode )
             {
-CONFIG::DEBUG { debug.Trace("Was main..."); }
+CONFIG::DEBUG { debug.Trace("Was WebSocket..."); }
                 // Was WebSocket connection
                 cb.Close();
                 return;
             }
+            // Else... well, the client may be opening/closing all kinds of XMLHttpRequests.  We have to time out.
             var search : String;
             for( search in cb.clients )
             {   // Substitute with some other 'main'

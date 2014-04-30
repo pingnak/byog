@@ -23,10 +23,10 @@ package com.pingnak
         /** PNG is transparent layer */
         public static const bTransparent  : uint = 0x02;
 
-        /** Mask against previous png */
+        /** Mask against previous png, and generate difference PNG */
         public static const bDelta        : uint = 0x04;
 
-        /** Pack only visible portion */
+        /** Pack only visible portion, and bounding xOff/yOff are important */
         public static const bMinimum      : uint = 0x08;
 
         /** Base 64 encode results to text, instead of returning binary data */

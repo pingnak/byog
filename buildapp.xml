@@ -28,31 +28,43 @@
             </exec>
 		</sequential>
 	</target>
-
-	<!-- Build the worker (thread) -->
-    <target name="worker" description="Build worker thread" >
+	
+	<!-- For releases, build  -->
+	<target name="notuptodate" >
 		<sequential>
-			<macro-buildexec target="${source.dir}/com/worker/worker.swf" src="${source.dir}" main="com/worker/WorkerPack.as" debug="false" release="true" buildtype="+configname=air" />
+        	   <property name="build.anyway" value="true"/>
+        	</sequential>
+    </target>
+	
+	<!-- For run target, check before building -->
+	<target name="uptodate" >
+		<sequential>
+			<condition property="build.uptodate">
+				<and>
+				    <not><isset property="build.anyway"/></not>
+					<uptodate property="build.uptodate" targetfile="${app.target}">
+						<srcfiles dir="./${targetname}" includes="build.properties"/>
+						<srcfiles dir="." includes="build.xml"/>
+						<srcfiles dir="." includes="buildapp.xml"/>
+						<srcfiles dir="." includes="build.properties"/>
+						<srcfiles dir="${source.dir}" includes="**/*"/>
+					</uptodate>
+				</and>
+			</condition>
 		</sequential>
 	</target>
 
-	<!-- AIR setup - remove aircert from the depends if you have a certificate -->
-    <target name="release" description="Build AIR Deployable Target" depends="aircert,worker,ndebug"  >
+	<!-- Build the worker (thread) -->
+    <target name="worker" description="Build worker thread" depends="uptodate" unless="build.uptodate" >
 		<sequential>
-			<echo>AIR Setup...</echo>
-			<!-- Air file mysteriously grows each time.  So delete it, first. -->
-			<delete file="./${targetname}/${targetname}.air" />
-			<exec executable="adt" searchpath="true" vmlauncher="false" failonerror="true" >
-				<arg line="-package"/>
-				<arg line="-storetype ${air.cert.type}"/>
-				<arg line="-keystore ${air.certificate}"/>
-				<arg line="-storepass ${air.cert.password}"/>
-				<arg line="./${targetname}/${targetname}.air"/>		<!-- Output file -->
-				<arg line="./${targetname}/${targetname}-app.xml"/>	<!-- AIR project info -->
-				<arg line="-C ./${targetname}"/>	            <!-- Change folder -->
-				<arg line="."/> 				            <!-- Recursively add everything in deploy -->
-				<!-- Add other files/folders to list -->
-			</exec>
+			<macro-build target="${source.dir}/com/worker/worker.swf" main="com/worker/WorkerPack.as" debug="false" release="true" swcs="" />
+		</sequential>
+	</target>
+
+	<!-- Build the debug version of the app -->
+    <target name="ndebug" description="Release-mode test build" depends="worker" unless="build.uptodate" >
+		<sequential>
+			<macro-build target="${app.target}" main="${app.main}" debug="false" release="true" swcs="-include-libraries '${app.resource}'" />
 		</sequential>
 	</target>
 	
@@ -62,26 +74,19 @@
 			<echo>${worker.swf}</echo>
 			<echo>${source.dir}</echo>
 			<echo>${worker.as}</echo>
-			<macro-buildexec target="${worker.swf}" src="${source.dir}" main="${worker.as}" debug="true" release="false" buildtype="+configname=air" />
+			<macro-build target="${worker.swf}" main="${worker.as}" debug="true" release="false" />
 		</sequential>
 	</target>
 	
 	<!-- Build the debug version of the app -->
-    <target name="debug" description="Debug instrumentated build" depends="workerdebug">
+    <target name="debug" description="Debug instrumentated build" >
 		<sequential>
-			<macro-buildexec target="${app.target}" src="${source.dir}" main="${app.main}" debug="true" release="false" buildtype="+configname=air" />
+			<macro-build target="${app.target}" main="${app.main}" debug="true" release="false"  swcs="-include-libraries '${app.resource}'" />
 		</sequential>
 	</target>
 
-	<!-- Build the debug version of the app -->
-    <target name="ndebug" description="Release-mode test build" depends="worker">
-		<sequential>
-			<macro-buildexec target="${app.target}" src="${source.dir}" main="${app.main}" debug="false" release="true" buildtype="+configname=air" />
-		</sequential>
-	</target>
-	
     <!-- Pseudo-target to run a release mode test -->
-    <target name="run" description="Run AIR Target" depends="ndebug">
+    <target name="run" description="Run AIR Target" depends="ndebug" >
 		<sequential>
 			<echo>Running in AIR...</echo>
 			<exec executable="adl" searchpath="true" vmlauncher="false">
@@ -142,16 +147,36 @@
 		</sequential>
 	</target>
 
+	<!-- AIR setup -->
+    <target name="release" description="Build AIR Deployable Target" depends="aircert,notuptodate,worker,ndebug"  >
+		<sequential>
+			<echo>AIR Setup...</echo>
+			<!-- Air file mysteriously grows each time.  So delete it, first. -->
+			<delete file="./${targetname}/${targetname}.air" />
+			<exec executable="adt" searchpath="true" vmlauncher="false" failonerror="true" >
+				<arg line="-package"/>
+				<arg line="-storetype ${air.cert.type}"/>
+				<arg line="-keystore ${air.certificate}"/>
+				<arg line="-storepass ${air.cert.password}"/>
+				<arg line="./${targetname}/${targetname}.air"/>		<!-- Output file -->
+				<arg line="./${targetname}/${targetname}-app.xml"/>	<!-- AIR project info -->
+				<arg line="-C ./${targetname}"/>	            <!-- Change folder -->
+				<arg line="."/> 				            <!-- Recursively add everything in deploy -->
+				<!-- Add other files/folders to list -->
+			</exec>
+		</sequential>
+	</target>
+	
 	<!--
 		Define mxmlc invocation
 	-->
-	<macrodef name="macro-buildexec">
-		<attribute name="main"/>		<!-- The 'main' application class -->
+	<macrodef name="macro-build">
+		<attribute name="main"/>		    <!-- The 'main' application class file -->
 		<attribute name="target"/>		<!-- Where the built target goes -->
-		<attribute name="src"/>			<!-- Where the preprocessed code goes -->
 		<attribute name="debug"/>		<!-- Debug flag -->
-		<attribute name="release"/>		<!-- Complimentary Release flag -->
-		<attribute name="buildtype"/>	<!-- Air (or not) -->
+		<attribute name="release"/>		<!-- Complementary Release flag (!debug) -->
+		<attribute name="swcs"/>		    <!-- Are we embedding any swc files? -->
+		
 		<sequential>
 			<tstamp />
 			<echo>MXMLC @{target}...</echo>
@@ -160,7 +185,7 @@
 				'mxmlc.exe' vs 'mxmlc' on any other platform.
 			-->
 			<exec executable="mxmlc" searchpath="true" vmlauncher="false" failonerror="true" >
-				<arg line="@{buildtype}" />
+				<arg line="+configname=air" />
 				<!-- Set conditional compile directives and constants -->
 				<arg value="-compiler.define=CONFIG::FLASH_AUTHORING,false" />
 				<arg value="-compiler.define=CONFIG::MXMLC_BUILD,true" />
@@ -219,9 +244,11 @@
 				<arg line="-compiler.debug=@{debug}" /> 
 				<arg line="-compiler.optimize=@{release}" /> 
 				<!-- MAIN (must be last on list -->
-				<arg line="--source-path='@{src}'" />
+				<arg line="--source-path='${source.dir}'" />
+				<!-- Add swc libraries to project (binds them like this was made in Flash) --> 
+				<arg line="@{swcs}" />
 				<arg line="-o=@{target}"/>
-				<arg line="-file-specs='@{src}/@{main}'" />
+				<arg line="-file-specs='${source.dir}/@{main}'" />
 				<arg line="-target-player='${app.fullplayerversion}'" />
 				
 			</exec>
