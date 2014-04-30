@@ -77,3 +77,6 @@ While I could pre-cache the game sounds and other assets with the client, I don'
 
 The only kind of sound that is nearly-consistently 'realtime' playable is WebKit audio, and that is not supported on every browser.  Even with, it's much snappier on some browsers than others.  On Opera, the last hold-out for MP3 support, you won't hear anything, because this only serves MP3.  On older versions of various browsers, or IE (no WebKit), you may be hearing Web Audio (one sample, played through the web page loading/caching... if ever cached) versus WebKit audio API.  Needless to say, the 'Web Audio' can be awfully slow to begin playing, especially on browsers that refuse to cache audio, and make the server stream it from scratch... every... single... time.
 
+==The Web Client Is Procedural / Isn't (some development pattern)==
+
+Bite me.  Seriously, it's written to be simple and clear, all in one file, not to conform to your latest coding fads.
