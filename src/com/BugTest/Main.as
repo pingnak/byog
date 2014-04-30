@@ -14,7 +14,7 @@ package com.BugTest
     import flash.desktop.NativeApplication; 
     import flash.desktop.SystemIdleMode;
     import flash.filesystem.*;
-    
+
     import com.pingnak.*;
     
     /**

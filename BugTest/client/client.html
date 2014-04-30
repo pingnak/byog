@@ -33,8 +33,7 @@
       database of what clients can support what.  In some cases, this leads to symptoms
       and breakage.  It's unavoidable, whatever strategy you use.  I just elected to 
       use the strategy that doesn't create a full-time 'keep the list updated' job.
-      
-    
+
 -->
 <head>
 <title>%TITLE%</title>
@@ -115,8 +114,6 @@ a:active { color:#20ffff; text-decoration: none; }
     width:100%; 
     height:100%;
 
-}
-#derp {
     /* Try to let browser know not to SLOWLY turn our images into blurry smudges */
     image-rendering:optimizeSpeed;             /* Legal fallback */
     image-rendering:-moz-crisp-edges;          /* Firefox        */
@@ -224,7 +221,7 @@ function TellUsToRefresh(how)
     if( 0 != arguments.length )
     {
         refresh_container.innerHTML += "<br/><p>"+how+"</p>";
-        log(how);
+        log("It Broke: "+how);
     }
 }
 
@@ -339,6 +336,7 @@ function Startup()
     
     if( window.WebSocket )
     {   // Start up Modern client
+        log("** WebSocket Mode");
         SetContainer("wait_container");
         
         // Make a pool of these, or Chrome bleeds like a pig
@@ -350,6 +348,7 @@ function Startup()
     }
     else if( window.XMLHttpRequest )
     {   // Fall back to long poll client
+        log("** Long Ping Mode");
         SetContainer("wait_container");
 
         // Attempt to make do with 'long poll' mode client.  It will 'work'. 
@@ -432,8 +431,7 @@ function HandleWebSockMessage( evt )
     else
         HandleWebSockMessageBin( evt.data );
     // Dereference trying to decide where data is leaking.  
-    evt.stopPropagation();
-    evt.data = null;    
+    EatEvent(evt);
 }
 
 /** Handle binary message from WebSocket... not supported  */
@@ -544,9 +542,9 @@ function Shutdown()
 {
     // Stop long poll from carrying on after an error happens
     currentFrame = 0;
-    canvas.onmousedown = null;
-    canvas.ontouchstart = null;
-    canvas.onkeypress = null;
+    game_container.onmousedown = null;
+    game_container.ontouchstart = null;
+    window.onkeypress = null;
     if( null != websock )
     {
         websock.onclose = null;
@@ -581,6 +579,7 @@ function EatEvent(event)
 {
     event.stopPropagation(); 
     event.preventDefault();
+    event.data = null;
 }
 
 /** Mute button pressed */
@@ -590,6 +589,7 @@ function audioMute()
     document.getElementById('bplay').style.display="block";
     bMute=true;
 }
+
 /** Un-mute button pressed */
 function audioPlay()
 {
@@ -597,6 +597,7 @@ function audioPlay()
     document.getElementById('bplay').style.display="none";
     bMute=false;
 }
+
 /** Full screen API - attempt to enter full screen mode */
 function launchFullscreen() 
 {
@@ -615,6 +616,7 @@ function launchFullscreen()
         element.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
     }
 }
+
 /** Exit full screen mode */
 function exitFullscreen() 
 {
@@ -631,6 +633,7 @@ function exitFullscreen()
         document.webkitExitFullscreen();
     }
 }
+
 /** Update full screen buttons **/
 function HandleResize() 
 {
@@ -656,10 +659,10 @@ function HandleResize()
 
 <body onload="Startup();" ontouchmove="EatEvent(event);" >
 <!-- I would love to use img.name{} css, but firefox is broken, and I would rather have working. visible buttons -->
-<button id="bmute" type="button" alt="Mute" onclick="javascript: audioMute(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEUAAAD////////////////////////////////////////////////////////////MzMwA//////8AAADy8vJmZmYMDAylpaXf39/S0tL7+/szMzO/v79/f3/V1dXv7+8ZGRkA7+/19fWysrJMTEw/Pz9ycnJZWVnb29uMjIwAb28Av78AHx+ZmZnPz88APz8Af3/o6OgALy8ADw/l5eUAj48A39/Y2Nji4uImJibr6+v4+PgAX18uIjDuAAAAEHRSTlMAn88fb39fv98Pjz/vry9P4hZ5IQAAAY9JREFUOI21U9l2glAMvIogbjVcNgVURHGptWqtVdv+/3c1CXgB9bXzAOcwQzLZhCigGTrD0MQTtBqmVDAbrXse6cllDIzxxZGmUaFf6vIwhBKGE9krBdG6yRnusArqRfr6z3uFHF19TCRrN0EvGJfIGB+uFwEMpJ7xfTko+OXRplc6x8en7HCC7kTRUfjxxYKZh0kgMblAqfz78e/UsrNIFOIsqVjTUem9k2WRYL4G36MvCVbyohwsjxsrE4yuADHlGEgNM1CJI9fF9FYuAG8G6Zr6JRuiFtDf9n5/mlpKkI7Adel70BZNtmBbCiRANhM4zf8SoIdwnQvamcnd7rVkEvvIZZLJrEx/uw3fNjfBOsZeQ15m0aiFx0GokwtwqdXcKGGqWc04CM8i4mGBQ9PSi2FxEBYsU3qOeVjlcVMQEmxpYfIAQhhyVShggRvlh8znC3O3cuwgyhzqammDATzgUCytaNXkg+IbW1BCTSbVw0lk9bREH09PeV3h6XWeHq/DwOM1Ho6Xo7SbjHb57z+Fkj4Y/Z6SiQAAAABJRU5ErkJggg==" /></button>
-<button id="bplay" type="button" alt="Play" onclick="javascript: audioPlay(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAA/FBMVEUAAAD////////////////////////////////////////////////////////////MzMwA////////AADy8vLff38AAADrTEzf39/S0tL7+/v1JibVpaWfX1/7DAzv7+/V1dXPv79fn5/19fUzMzMA7+/b29sZGRnPz88AHx/l5eXo6OjoWVnY2Nh/f3/i4uJycnKlpaUALy8Af38APz+ZmZlmZmYMDAwAj48Ab29ZWVnlZmYADw/r6+vvPz8A39/4+PiysrK/v78AX1+fPz9ff3+sTExfb2+4GRmfHx8Av7+fAAAPAADPAADPLy/vDw8vAADvAAAP7+9fAAAbMRMJAAAAEHRSTlMAn88fb39fv98Pjz/vr08vyllz3gAAAaRJREFUOMt9k+d6gjAUhuNCtNaeBATFWqmA1rqrrd1773H/99LkMALq4/cHyPeS5CxCpDJKDqVkyAoVsiqLpGYLiz63myMbUPZIZ6qSsLfSrFeDmGpNthnbJFNyBrCgtpWWx6ev92BJNkuFwKZlm5Vwfdjxn/2zKsv5fplVoa8FxOm5gU+TL+yzDTyg1AwWAG7dgysDok9HxQBZLVyadO48akQ+DJgIVtUh2PRxfkypAMzwQIdHssVv4OtZe6IIRD5UWYafIEIcHh25Bw2tJQDpQ41lScoSb8Z0euxRJN6kD2AVSR6vYFAUJxpxH/R8EuCE9gfrgJb29b0OaGmNz5/tJFD0LzmbnXjCp78fO9uJS/phTg4P3e4D9yl9r0tChCkTda+9eCIPu5IQiSJq0/+oaKbbfRWZlIQuqpXzi8V9gPH8xOO1CAkbi+WXG32AG7crqhkQuAEhCmuHPtcYOwqJoGGw5ermQkfu1i+jluNNa1WXm7Ynm5YUUmyJuOApiCnFnOTgOCw5WqTMR68dDQ0fvY2Vw6uj+PAqhVUDXi7mUcX43/8Lt0LLVkEZYAAAAABJRU5ErkJggg==" /></button>
-<button id="bfull" type="button" alt="Full" onclick="javascript: launchFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAh1BMVEUAAAD////////////////////////////////////////////////////////////MzMwAAABmZmb////y8vKZmZnf39/S0tK/v7/7+/vv7+/V1dVycnIzMzP19fWlpaXb29t/f38MDAzPz8/l5eXo6OgZGRnY2Nji4uKysrI/Pz/r6+v4+Ph2iCexAAAAEHRSTlMAn88fb39fv98Pjz+v708vIdemIwAAATNJREFUOMu9k9ViwzAMRR2GkmKFubS22/7/+yY74EDhbefNuTeSLWBMYdiWxDbYEzzTxRHX9JY6yfm9AElxD9G1Z/JBx2sCE5Ict5Mgxq6+wYI201V6/fcMKwrUBsM2K9KS86MSj5yXaYxWp+8xhjIgmkFPxYnDBTcywS4H4MEyAxmgduUDMXlluKF4rBuKpCeA72CkAvgq6XNNLznQDfp/Kt5TDfFiNCjDeRK0Y0yYoMm0DF4bIPOZE74zhM5/GPxPl/z4zK5QabMsVJP2hWIu9Yq6ScVVpabCn0S8UHTLet2sQjarb3cUPZT6iCJhkAEYs7F9OzDdyEWEiiBOauRoaLMYVlzV0DJPw5Xjh0owQcN6vjg1zleL7Wn12kFuafU2T5c3lNDy2qvllVF8R+JP//4Dk+I28wchU68AAAAASUVORK5CYII=" /></button>
-<button id="bback" type="button" alt="Back" onclick="javascript: exitFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAjVBMVEUAAAD////////////////////////////////////////////////////////////MzMwAAACZmZn///8zMzNmZmby8vLf39/S0tL7+/vV1dXv7+/19fXb29u/v7+ysrI/Pz/Pz8+lpaV/f39ycnLi4uLY2Njo6Ojl5eUMDAwZGRmMjIzr6+v4+PgmJia8QUr3AAAAEHRSTlMAn88fb39fv98Pjz+vL0/vKxzy0wAAAUJJREFUOI2Vk9dyg0AMRZde3ARi6WAbsB2n/f/nRSws3cnkvrAzOqiLsVGaaQiZGtuQo9s4yNadpZ3M2S0FofQWom3OzAcVHzFMFGe4nzjRTvkdFioSdQyvfl2XdgqEigT2SXrmS9UQodHZjxjBxVvJhzfciQCnDCAIFgF8AiC3RYEYvwLu2BZrh9ABbRgOUL57XtABkFMlB8qgA7yA8w96cx54PRChRhGuEuDSP5dAjDpTEuiB5wA0EoDEZVYogaqUQFlJILQmwLqK/wJ1Ja3nZgK4Q5IbVbRJ/lnmvFFnetfzRjE76wFqsXehGunz7IGwnZbxelipGFY37m9/rqYFhAPGTCx+XZhu5fyVxpWjpU0iWOkxLi1zFFwRn9SCiRTM54eT4/y02JFOr5Dmgk5vt3m8oRAdr7k6XuHFtYTc6d8/cHY4TyWtZDAAAAAASUVORK5CYII=" /></button>
+<button id="bmute" type="button" alt="Mute" onmousedown="javascript: audioMute(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEUAAAD////////////////////////////////////////////////////////////MzMwA//////8AAADy8vJmZmYMDAylpaXf39/S0tL7+/szMzO/v79/f3/V1dXv7+8ZGRkA7+/19fWysrJMTEw/Pz9ycnJZWVnb29uMjIwAb28Av78AHx+ZmZnPz88APz8Af3/o6OgALy8ADw/l5eUAj48A39/Y2Nji4uImJibr6+v4+PgAX18uIjDuAAAAEHRSTlMAn88fb39fv98Pjz/vry9P4hZ5IQAAAY9JREFUOI21U9l2glAMvIogbjVcNgVURHGptWqtVdv+/3c1CXgB9bXzAOcwQzLZhCigGTrD0MQTtBqmVDAbrXse6cllDIzxxZGmUaFf6vIwhBKGE9krBdG6yRnusArqRfr6z3uFHF19TCRrN0EvGJfIGB+uFwEMpJ7xfTko+OXRplc6x8en7HCC7kTRUfjxxYKZh0kgMblAqfz78e/UsrNIFOIsqVjTUem9k2WRYL4G36MvCVbyohwsjxsrE4yuADHlGEgNM1CJI9fF9FYuAG8G6Zr6JRuiFtDf9n5/mlpKkI7Adel70BZNtmBbCiRANhM4zf8SoIdwnQvamcnd7rVkEvvIZZLJrEx/uw3fNjfBOsZeQ15m0aiFx0GokwtwqdXcKGGqWc04CM8i4mGBQ9PSi2FxEBYsU3qOeVjlcVMQEmxpYfIAQhhyVShggRvlh8znC3O3cuwgyhzqammDATzgUCytaNXkg+IbW1BCTSbVw0lk9bREH09PeV3h6XWeHq/DwOM1Ho6Xo7SbjHb57z+Fkj4Y/Z6SiQAAAABJRU5ErkJggg==" /></button>
+<button id="bplay" type="button" alt="Play" onmousedown="javascript: audioPlay(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAA/FBMVEUAAAD////////////////////////////////////////////////////////////MzMwA////////AADy8vLff38AAADrTEzf39/S0tL7+/v1JibVpaWfX1/7DAzv7+/V1dXPv79fn5/19fUzMzMA7+/b29sZGRnPz88AHx/l5eXo6OjoWVnY2Nh/f3/i4uJycnKlpaUALy8Af38APz+ZmZlmZmYMDAwAj48Ab29ZWVnlZmYADw/r6+vvPz8A39/4+PiysrK/v78AX1+fPz9ff3+sTExfb2+4GRmfHx8Av7+fAAAPAADPAADPLy/vDw8vAADvAAAP7+9fAAAbMRMJAAAAEHRSTlMAn88fb39fv98Pjz/vr08vyllz3gAAAaRJREFUOMt9k+d6gjAUhuNCtNaeBATFWqmA1rqrrd1773H/99LkMALq4/cHyPeS5CxCpDJKDqVkyAoVsiqLpGYLiz63myMbUPZIZ6qSsLfSrFeDmGpNthnbJFNyBrCgtpWWx6ev92BJNkuFwKZlm5Vwfdjxn/2zKsv5fplVoa8FxOm5gU+TL+yzDTyg1AwWAG7dgysDok9HxQBZLVyadO48akQ+DJgIVtUh2PRxfkypAMzwQIdHssVv4OtZe6IIRD5UWYafIEIcHh25Bw2tJQDpQ41lScoSb8Z0euxRJN6kD2AVSR6vYFAUJxpxH/R8EuCE9gfrgJb29b0OaGmNz5/tJFD0LzmbnXjCp78fO9uJS/phTg4P3e4D9yl9r0tChCkTda+9eCIPu5IQiSJq0/+oaKbbfRWZlIQuqpXzi8V9gPH8xOO1CAkbi+WXG32AG7crqhkQuAEhCmuHPtcYOwqJoGGw5ermQkfu1i+jluNNa1WXm7Ynm5YUUmyJuOApiCnFnOTgOCw5WqTMR68dDQ0fvY2Vw6uj+PAqhVUDXi7mUcX43/8Lt0LLVkEZYAAAAABJRU5ErkJggg==" /></button>
+<button id="bfull" type="button" alt="Full" onmousedown="javascript: launchFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAh1BMVEUAAAD////////////////////////////////////////////////////////////MzMwAAABmZmb////y8vKZmZnf39/S0tK/v7/7+/vv7+/V1dVycnIzMzP19fWlpaXb29t/f38MDAzPz8/l5eXo6OgZGRnY2Nji4uKysrI/Pz/r6+v4+Ph2iCexAAAAEHRSTlMAn88fb39fv98Pjz+v708vIdemIwAAATNJREFUOMu9k9ViwzAMRR2GkmKFubS22/7/+yY74EDhbefNuTeSLWBMYdiWxDbYEzzTxRHX9JY6yfm9AElxD9G1Z/JBx2sCE5Ict5Mgxq6+wYI201V6/fcMKwrUBsM2K9KS86MSj5yXaYxWp+8xhjIgmkFPxYnDBTcywS4H4MEyAxmgduUDMXlluKF4rBuKpCeA72CkAvgq6XNNLznQDfp/Kt5TDfFiNCjDeRK0Y0yYoMm0DF4bIPOZE74zhM5/GPxPl/z4zK5QabMsVJP2hWIu9Yq6ScVVpabCn0S8UHTLet2sQjarb3cUPZT6iCJhkAEYs7F9OzDdyEWEiiBOauRoaLMYVlzV0DJPw5Xjh0owQcN6vjg1zleL7Wn12kFuafU2T5c3lNDy2qvllVF8R+JP//4Dk+I28wchU68AAAAASUVORK5CYII=" /></button>
+<button id="bback" type="button" alt="Back" onmousedown="javascript: exitFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAjVBMVEUAAAD////////////////////////////////////////////////////////////MzMwAAACZmZn///8zMzNmZmby8vLf39/S0tL7+/vV1dXv7+/19fXb29u/v7+ysrI/Pz/Pz8+lpaV/f39ycnLi4uLY2Njo6Ojl5eUMDAwZGRmMjIzr6+v4+PgmJia8QUr3AAAAEHRSTlMAn88fb39fv98Pjz+vL0/vKxzy0wAAAUJJREFUOI2Vk9dyg0AMRZde3ARi6WAbsB2n/f/nRSws3cnkvrAzOqiLsVGaaQiZGtuQo9s4yNadpZ3M2S0FofQWom3OzAcVHzFMFGe4nzjRTvkdFioSdQyvfl2XdgqEigT2SXrmS9UQodHZjxjBxVvJhzfciQCnDCAIFgF8AiC3RYEYvwLu2BZrh9ABbRgOUL57XtABkFMlB8qgA7yA8w96cx54PRChRhGuEuDSP5dAjDpTEuiB5wA0EoDEZVYogaqUQFlJILQmwLqK/wJ1Ja3nZgK4Q5IbVbRJ/lnmvFFnetfzRjE76wFqsXehGunz7IGwnZbxelipGFY37m9/rqYFhAPGTCx+XZhu5fyVxpWjpU0iWOkxLi1zFFwRn9SCiRTM54eT4/y02JFOr5Dmgk5vt3m8oRAdr7k6XuHFtYTc6d8/cHY4TyWtZDAAAAAASUVORK5CYII=" /></button>
 
 <!-- div layer for game -->
 <div id="game_container">
@@ -676,7 +679,7 @@ function HandleResize()
 <div id="refresh_container">
     <h1>SOMETHING BROKE</h1>
     <br/>
-    <p class="center"><input type="button" value="Refresh" onclick="javascript:location.reload(); return false;"/> the browser to reload, and try again.</p>
+    <p class="center"><input type="button" value="Refresh" onmousedown="javascript:location.reload(); return false;"/> the browser to reload, and try again.</p>
     <br/>
 </div>
 
@@ -790,9 +793,9 @@ function DrawImage(data,layer,pendingFrame,offX,offY,wide,high)
     // Skip frames if crummy browser is slow, unpacking things
     var image = imagePool.shift();
     
-    assert( null != image );
+    //assert( null != image );
     if( null == image )
-        return;
+        return; // Client is flooded with refreshes.
 
     image._pendingProps.layer = layer;
     image._pendingProps.pendingFrame = pendingFrame;
@@ -809,6 +812,7 @@ function DrawImage(data,layer,pendingFrame,offX,offY,wide,high)
     data = null;
 }
 
+/** Callback when base64 image is decoded */
 function ImageLoaded() 
 {   
     // Though this looks like an extra step, a few mobile browsers implement 
@@ -1031,6 +1035,7 @@ function HandleKeyPress(evt)
     else
         return;
     var key = "key,"+currentFrame+","+char+","+evt.shiftKey+","+evt.ctrlKey;
+    trace("Key: "+key);
     if( null != websock )
         websock.send(key);
     else
@@ -1041,14 +1046,12 @@ function HandleKeyPress(evt)
 /** Handle touch */
 function HandleTouchStart(evt)
 {
-    evt.stopPropagation(); 
-    evt.preventDefault();
     var touch = evt.touches[0];
     var scale = canvas.width/window.innerWidth;
     var mx = touch.clientX*scale;
     var my = touch.clientY*scale;
     var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
-    trace(click);
+    trace("Touch: "+click);
     if( null != websock)
     {
         websock.send(click);
@@ -1057,18 +1060,24 @@ function HandleTouchStart(evt)
     {
         xmlhttpUpload += '&'+click;
     }
+    EatEvent(evt);
 }
 
 /** Capture first 'touch', to give audio permission to play */
 function HandleFirstTouch(evt)
 {
-    if( !PlayCachedAudioWebKit("%SILENT_MP3%") )
+    if( PlayCachedAudioWebKit("%SILENT_MP3%") )
     {
+        log("WebKit Audio Mode");
+    }
+    else
+    {
+        log("Web Audio Mode");
         PlaySound = PlayAudio;
         PlaySound("%SILENT_MP3%");
     }
-    canvas.onmousedown = HandleMouseDown;
-    canvas.ontouchstart = HandleTouchStart;
+    game_container.onmousedown = HandleMouseDown;
+    game_container.ontouchstart = HandleTouchStart;
     HandleTouchStart(evt);
 }
 
@@ -1080,7 +1089,7 @@ function HandleMouseDown(evt)
     var mx = evt.clientX*scale;
     var my = evt.clientY*scale;
     var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
-    trace(click);
+    trace("Mouse: "+click);
     if( null != websock)
     {
         websock.send(click);
@@ -1089,19 +1098,25 @@ function HandleMouseDown(evt)
     {
         xmlhttpUpload += '&'+click;
     }
+    EatEvent(evt);
     return false;
 }
 
 /** Capture first 'click', to give audio permission to play */
 function HandleFirstMouseDown(evt)
 {
-    if( !PlayCachedAudioWebKit("%SILENT_MP3%") )
+    if( PlayCachedAudioWebKit("%SILENT_MP3%") )
     {
+        log("** WebKit Audio Mode");
+    }
+    else
+    {
+        log("** Web Audio Mode");
         PlaySound = PlayAudio;
         PlaySound("%SILENT_MP3%");
     }
-    canvas.onmousedown = HandleMouseDown;
-    canvas.ontouchstart = HandleTouchStart;
+    game_container.onmousedown = HandleMouseDown;
+    game_container.ontouchstart = HandleTouchStart;
     HandleMouseDown(evt);
 }
 

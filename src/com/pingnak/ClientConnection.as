@@ -18,7 +18,18 @@ package com.pingnak
      *
      * However, this presents us with a problem.  Over the internet, all of 
      * these sockets are potentially anonymous.  IP:PORT may be meaningless
-     * for identifying a particular 
+     * for identifying a particular connection belonging to one client or 
+     * another.  That makes it a little harder for me to clean them up on 
+     * this end.  Some tablets and whatnot leave these sockets open, even
+     * after you navigate away, and in some cases, even after you 'sleep' or
+     * idle the device.  That will keep the radio transmitter 'hot' and 
+     * sending TCP 'keep alive' events, nibbling away at your battery.
+     *
+     * Worse still, with 'location' enabled to the browser, this could 
+     * literally be used to track your physical position for indefinite  
+     * periods of time, simply by writing a bit of javascript on a web page.
+     *
+     * Important tip: If you have a mobile device, close the browser tabs.
      *
     **/
     public class ClientConnection extends EventDispatcher
