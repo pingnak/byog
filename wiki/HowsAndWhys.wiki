@@ -36,9 +36,15 @@ Also, arbitrary complexity.  In an RPG game, with characters that can be dressed
 
 I send a lower resolution image than the client (except for some phones with really low resolution), mainly for crummy tablet/phone performance, compounded by relatively crummy AIR PNG compression performance, on higher resolution images.  On some browsers, the scaling looks worse than others, and always looks worse, the bigger you blow it up.  'Retro' pixelated effects are certainly possible.  This is adjustable, but more CPU and more bandwidth, for more pixels, and all of that.  There is little to no control over how browsers 'scale' imagery.  This is like a snowflake on a Titanic-sinking iceberg, compared to all of the problems in HTML5 Canvas and various flavors of browsers.  There's certainly more tinkering to do, and possibilities of allowing 'real desktop' clients to work in 'HD', however detection of what has that kind of capability is difficult, from a web based client, and even harder from the server, and was beyond the scope of my initial effort.  According to whether this is home or venue or ISP based, that 'HD' may become a significant liability, if everyone brings a notebook with a big 'retina' display, to play.
 
+Things that could easily simplify/multiply the compression would be writing a native eight bit color indexed render engine, limiting the art to a more standardized palette, and sending only 8 bit PNGs (or GIFs, if we're dealing with color indexed art).
+
+Another modest improvement would be eliminating some of the standard 'chunks' off the PNG files we send constantly, and tacking them on, on the client side.  That way, we could send just the IDAT chunks, and paste them into a PNG template that matches the format.
+
+Moving the base64 step to the client would obviously save 25% off network bandwidth, but you'll probably have to slow down the frame rate for less capable devices.
+
 ==Typing in that IP:Port...==
 
-Well, you need a name server, and preferably a 'captive portal' capable router, that would link or redirect you to the game(s).
+Well, you need a name server, and preferably a 'captive portal' capable router, with a welcome page that would link or redirect you to the game(s).
 
 ==Glitches in Certain Browsers==
 
@@ -77,6 +83,6 @@ While I could pre-cache the game sounds and other assets with the client, I don'
 
 The only kind of sound that is nearly-consistently 'realtime' playable is WebKit audio, and that is not supported on every browser.  Even with, it's much snappier on some browsers than others.  On Opera, the last hold-out for MP3 support, you won't hear anything, because this only serves MP3.  On older versions of various browsers, or IE (no WebKit), you may be hearing Web Audio (one sample, played through the web page loading/caching... if ever cached) versus WebKit audio API.  Needless to say, the 'Web Audio' can be awfully slow to begin playing, especially on browsers that refuse to cache audio, and make the server stream it from scratch... every... single... time.
 
-==The Web Client Is Procedural / Isn't (some development pattern)==
+==The Web Client Is Procedural / Isn't (your personal favorite development pattern)==
 
-Bite me.  Seriously, it's written to be simple and clear, all in one file, not to conform to your latest coding fads.
+Bite me.  Seriously, it's written to be simple and clear, all in one file, not to conform to your latest fads.
