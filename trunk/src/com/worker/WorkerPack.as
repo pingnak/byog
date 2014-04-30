@@ -178,7 +178,7 @@ CONFIG::DEBUG { debug.Trace("*Doomy-doom!"); }// If you see this, something's ho
         }
 
         /**
-         * Generate Delta Frame
+         * Generate Frame
          * Parameters in baReceive: 
          *      left, top, wide, high - bounding box to clip compression 
         **/
@@ -219,7 +219,11 @@ CONFIG::DEBUG { debug.Trace("*Doomy-doom!"); }// If you see this, something's ho
                     // Is no better that 'solid I-frames', when solid content scrolls, or does things '3D'
                     // Compare with prior render to get differences.  
                     if( null == bmPrev || bmPrev.width != wide || bmPrev.height != high )
+                    {
+                        if( null != bmPrev )
+                            bmPrev.dispose();
                         bmPrev = new BitmapData(wide,high,0 != (WorkerPackData.bTransparent & control_mask),0);
+                    }
 
                     // This allocates a bitmap (wasteful), but is super fast compared to script
                     diff = bmCurr.compare(bmPrev) as BitmapData;

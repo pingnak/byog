@@ -16,6 +16,7 @@ package com.pingnak
     {
         private static var idCurr : int = 0;
 
+        /** Worker has to be a swf.  */
         [Embed(source="../worker/worker.swf", mimeType="application/octet-stream")] 
         private static const BAWorker:Class;
         internal static function get BABackgroundWorker() : ByteArray { return new BAWorker(); }

@@ -191,7 +191,7 @@ package com.BugTest
         {
             DoomsDayPostpone();
             var aParts : Array = str.split(',');
-            CONFIG::DEBUG { if( "frame" != aParts[0] ) trace("WSReceivedTextMessage:",str); }
+            //CONFIG::DEBUG { if( "frame" != aParts[0] ) trace("WSReceivedTextMessage:",str); }
             var wide : int;
             var high : int;
             switch(aParts.shift())
@@ -481,7 +481,7 @@ package com.BugTest
         **/
         public function Click( frame : int, x:Number, y:Number, shift:Boolean, ctrl:Boolean ) : void
         {
-            trace("Click("+serverFrame+"):",frame,x,y,shift,ctrl);
+            Trace("Click("+serverFrame+"):",frame,x,y,shift,ctrl);
             
             // Use the way-back machine map to find out what the user clicked on
             var ptio : Point = new Point(x,y);

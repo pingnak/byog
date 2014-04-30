@@ -82,13 +82,6 @@ package com.BugTest
         internal static const SO_PATH : String = "ServerPreferences";
         internal static const SO_SIGN : String = "SERVER_PREF_SIGN_00";
         
-CONFIG::MXMLC_BUILD
-{
-        /** Main SWF */
-        [Embed(source="./Resource.swf", mimeType="application/octet-stream")]
-        public static const baMainSwfClass : Class;
-}
-        
         internal var GameWide : Number;
         internal var GameHigh : Number;
 
@@ -145,15 +138,9 @@ CONFIG::MXMLC_BUILD
             var file : File = new File( root.url + String(xml.tilemap) );
             tilemap.FromRendered( file );
             
-CONFIG::MXMLC_BUILD
-{           // Decode+initialize the swf content the UI was made of
-            var loader : Loader = applet.LoadFromByteArray(new baMainSwfClass());
-            loader.contentLoaderInfo.addEventListener( Event.INIT, UI_Ready );
-}
-CONFIG::FLASH_AUTHORING
-{           // Built by Flash, so resources are already loaded+initialized
+            // Built by Flash, so resources are already loaded+initialized
             UI_Ready();
-}
+
             /** Set game client in charge of client bundles */
             ClientBundle.ClientClass = GameClient;
 
