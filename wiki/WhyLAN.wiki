@@ -28,7 +28,7 @@ Optionally, buy (or obtain, or reuse) a Wifi router just for this.  No need to c
 
 ==Configuration 1a: Game/Embedded Device Controller==
 
-As a remote control or game controller, or remote administration terminal, the client could readily manage realtime inputs and outputs from a variety of devices.  If it has its own display, you could do just a bit of hacking, and now it can be 'controlled and monitored by your phone/ipad/computer/Smart TV/etc., through a web browser, on a LAN.  Slash a good chunk of change off your unit cost, with a quick and dirty hack.
+As a remote control or game controller, or remote administration terminal, the client could readily manage realtime inputs and outputs from a variety of devices.  If it has its own display, you could do just a bit of hacking, and now it can be controlled and monitored by your phone/ipad/computer/Smart TV/etc., through a web browser, on a LAN.  Slash a good chunk of change off your unit cost, with a quick and dirty hack.
 
 ==Configuration 2: Business / Coffee Shop / Bar / Waiting Room / etc.==
 
