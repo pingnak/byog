@@ -12,6 +12,10 @@
 			http://java.com/en/download/manual.jsp
 			
 	Make sure all of that is in the 'path'.
+
+   Recommended: Set/export this for the shell; ant will be less spammy, by default.
+   ANT_ARGS='-e -q'
+	
 -->
 <project basedir="." name="Main Build Script" default="all" >
 

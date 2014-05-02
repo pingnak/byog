@@ -149,6 +149,7 @@ a:active { color:#20ffff; text-decoration: none; }
 </style>
 
 <script type="text/javascript">
+"use strict";
 
 // Single sample mp3: 96 bytes (*4/3)
 var silent_mp3 = "//MUxAAAAANIAAAAAExBTUUzLjk4LjJV//MUxAsAAANIAAAAAFVVVVVVVVVVVVVV//MUxBYAAANIAAAAAFVVVVVVVVVVVVVV//MUxCEAAANIAAAAAFVVVVVVVVVVVVVV";
@@ -432,6 +433,7 @@ function HandleWebSockMessage( evt )
         HandleWebSockMessageBin( evt.data );
     // Dereference trying to decide where data is leaking.  
     EatEvent(evt);
+    //evt.data = null;
 }
 
 /** Handle binary message from WebSocket... not supported  */
@@ -579,7 +581,6 @@ function EatEvent(event)
 {
     event.stopPropagation(); 
     event.preventDefault();
-    event.data = null;
 }
 
 /** Mute button pressed */
@@ -685,6 +686,7 @@ function HandleResize()
 
 <!-- Bring the meat of our dumb terminal into one place -->
 <script type="text/javascript">
+"use strict";
 
 function EnableUI()
 {
@@ -865,6 +867,8 @@ function ClearTiles()
 {
     // Clear tile map contents
     var adestroy = [];
+    var key;
+    var img;
     for( key in tilemap ) 
     {
         img = tilemap[key];
@@ -959,7 +963,7 @@ function PlayAudioWebKit(data)
     request.onload = function() 
     {
         audiocontext.decodeAudioData(request.response, decoded);
-        request.response = null;
+        //request.response = null;
     };
     function decoded(buffer) 
     {

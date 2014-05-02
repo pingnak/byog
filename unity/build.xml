@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+   Build Unity Project Script
+   
+   Recommended: Set/export this for the shell; ant will be less spammy, by default.
+   ANT_ARGS='-e -q'
+-->
+
+<project basedir="." default="build" >
+ 
+    <!-- See also: https://docs.unity3d.com/Documentation/Manual/CommandLineArguments.html -->
+	<target name="build" description="Build all of the other build.xml files"  >
+	
+	    <!-- Get full paths to things, to pass to unity -->
+	    <property name="absolute.project" location="./BugTest"/>
+	    <property name="absolute.logfile" location="./buildoutput.txt"/>
+	    
+	    <!-- Paths to invoke unity, for various environments -->
+	    <condition property="unity.path" value="/Applications/Unity/Unity.app/Contents/MacOS/Unity">
+            <os family="mac" />
+        </condition>
+        <condition property="unity.path" value="C:\Program Files (x86)\Unity\Editor\Unity.exe" >
+            <os family="windows" />
+        </condition>
+        <!-- Linux build condition... -->
+        
+        <sequential>
+            <!-- Have Unity do the build.  Unity WILL NOT build while the IDE is open, BTW. -->
+            <exec executable="${unity.path}" searchpath="false" resultproperty="build.result" >
+                <arg line="-batchmode"/>
+                <arg line="-projectPath '${absolute.project}'" />
+                <arg line="-logFile '${absolute.logfile}'" />
+                <arg line="-quit"/>
+				<redirector input="${absolute.logfile}" >
+					<errorfilterchain>
+					</errorfilterchain>
+				</redirector>
+            </exec>
+            
+            <!-- Tell us about output -->
+            <concat>
+                <fileset file="${absolute.logfile}" />
+            </concat>
+            
+            <!-- Be tidy about the extra error file. -->
+            <delete file="${absolute.logfile}" />
+            
+            <!-- Tell us about output -->
+            <fail message="Unity build failed." status="${build.result}" >
+                <condition>
+                    <not>
+                        <equals arg1="${build.result}" arg2="0"/>
+                    </not>
+                </condition>
+            </fail>
+        </sequential>
+        
+	</target>
+	
+</project>
+
