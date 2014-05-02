@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+   Build all projects
+
+   Recommended: Set/export this for the shell; ant will be less spammy, by default.
+   ANT_ARGS='-e -q'
+-->
+
+<project basedir="." default="buildall" >
+
+	<target name="buildall" description="Build all of the other build.xml files"  >
+        <sequential>
+            <subant target="">
+                <fileset dir="." includes="*/build.xml"/>
+            </subant>
+        </sequential>
+	</target>
+	
+	<!-- Zip everything up 'right'; just drops into any build.xml -->
+	<target name="zip" description="Make an archive of the project, in its current state." >
+		<sequential>
+			<tstamp />
+			<dirname property="dirname.folder" file="${ant.file}"/>
+			<property name="zip.path" relative="true" location="${dirname.folder}_${DSTAMP}${TSTAMP}.zip"/>
+			<echo>Archiving project to ${zip.path}</echo>
+			<zip destfile="${zip.path}" level="9" >
+				<fileset dir="." defaultexcludes="true">
+					<include name="**" />
+				</fileset>
+			</zip>
+		</sequential>		
+	</target>
+
+</project>
+
