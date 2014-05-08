@@ -6,6 +6,8 @@ package com.pingnak
     import flash.events.*;
     import flash.net.*;
     import flash.display.*;
+    import flash.desktop.NativeApplication;
+    import flash.desktop.SystemIdleMode;
     import com.pingnak.*;
 
     /**
@@ -70,6 +72,8 @@ package com.pingnak
             cache_life = uint(xml.cache_life);
             banned = new Dictionary();
             clientConnections = new Dictionary();
+            // Don't fall asleep while running a server.  It's just annoying.
+            NativeApplication.nativeApplication.systemIdleMode = SystemIdleMode.KEEP_AWAKE;
         }
         
         /**

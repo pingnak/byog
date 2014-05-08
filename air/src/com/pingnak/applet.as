@@ -18,7 +18,6 @@ package com.pingnak
     **/
     public class applet extends MovieClip
     {
-
         /** App instance */
         public static var instance : applet = null;
         

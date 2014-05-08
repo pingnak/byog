@@ -143,16 +143,26 @@
 			    <arg line="-profile desktop" />
 				<arg line="./${targetname}/${targetname}-app.xml"/>
 				<arg line="./${targetname}"/>
+				<redirector alwayslog="true" />
 			</exec>
 		</sequential>
 	</target>
 
 	<!-- AIR setup -->
     <target name="release" description="Build AIR Deployable Target" depends="aircert,notuptodate,worker,ndebug"  >
+	    <property name="absolute.air" location="./${targetname}/${targetname}.air"/>
+	    
+	    <!-- Paths to invoke unity, for various environments -->
+	    <condition property="airappinstaller.path" value="/Applications/Adobe/Flash Player/AddIns/airappinstaller/airappinstaller">
+            <os family="mac" />
+        </condition>
+        <condition property="airappinstaller.path" value="C:\Program Files\Adobe\Flash Player\AddIns\airappinstaller\airappinstaller.exe" >
+            <os family="windows" />
+        </condition>
 		<sequential>
 			<echo>AIR Setup...</echo>
 			<!-- Air file mysteriously grows each time.  So delete it, first. -->
-			<delete file="./${targetname}/${targetname}.air" />
+			<delete file="${absolute.air}" />
 			<exec executable="adt" searchpath="true" vmlauncher="false" failonerror="true" >
 				<arg line="-package"/>
 				<arg line="-storetype ${air.cert.type}"/>
@@ -163,7 +173,17 @@
 				<arg line="-C ./${targetname}"/>	            <!-- Change folder -->
 				<arg line="."/> 				            <!-- Recursively add everything in deploy -->
 				<!-- Add other files/folders to list -->
+				<redirector alwayslog="true" />
 			</exec>
+
+			<echo>Installing ${absolute.air}</echo>
+			<exec executable="${airappinstaller.path}" searchpath="true" vmlauncher="false" failonerror="true" >
+				<arg line="-silent"/>
+				<arg line="-eulaAccepted"/>
+				<arg line="-desktopShortcut"/>
+				<arg line="${absolute.air}" />
+			</exec>
+
 		</sequential>
 	</target>
 	
@@ -178,8 +198,11 @@
 		<attribute name="swcs"/>		    <!-- Are we embedding any swc files? -->
 		
 		<sequential>
-			<tstamp />
 			<echo>MXMLC @{target}...</echo>
+			<tstamp />
+			<echo/>
+			<echo>BUILD VERSION ${DSTAMP}${TSTAMP}</echo>
+			<echo/>
 			<!--
 				We use the java invocation, since the 'exec' chokes on Windoze
 				'mxmlc.exe' vs 'mxmlc' on any other platform.
@@ -251,10 +274,10 @@
 				<arg line="-file-specs='${source.dir}/@{main}'" />
 				<arg line="-target-player='${app.fullplayerversion}'" />
 				
+				<redirector alwayslog="true" />
+
 			</exec>
-			<echo/>
-			<echo>BUILD VERSION ${DSTAMP}${TSTAMP}</echo>
-			<echo/>
+
 		</sequential>
 	</macrodef>
 	
