@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<swf2psd>
+    
+    <!-- 
+        Tasks come from common exports and the imports needed to make them.
+        
+        Associate AIR app with '.swf2psd'.
+
+        
+        
+        * Notes
+        
+        http://blog.teleranek.org
+        
+        http://durej.com/?p=128
+        
+        http://forum.unity3d.com/threads/29327-Flash-To-Unity
+
+    -->
+
+    <!-- 
+        Export a texture atlas from MovieClips
+        
+        Recurse through children of mc, and make the various named
+        DisplayObjects, at correct layouts and depths into bitmaps.
+        
+        Unnamed components may optionally be composited together into a single
+        bitmap.
+        
+        Scale up/down and render individual parts to an appropriate resolution
+        for eventual target platform.
+        
+        Frames and animations? Probably not. Keeping the parts separate and
+        getting something to animate within Unity is my goal here.
+    -->
+    <export path="./BugTest.png" >
+
+        <!-- A SWF file to grab parts from -->
+        <swf path="./BugTest.swf" >
+          
+            <!-- List of parts within the swf file, to pick apart -->
+            <clip id="Airplane"  />
+            <clip id="PickPlane" /> 
+
+            <clip id="Bug" /> 
+            <clip id="Bang" /> 
+        </swf>
+    </export>
+
+    <!-- Export a psd model from MovieClips 
+    <export path="./BugTest.psd" >
+        <swf path="./BugTest.swf" >
+            <clip id="Airplane" />
+            <clip id="PickPlane" /> 
+
+            <clip id="Bug" /> 
+            <clip id="Bang" /> 
+        </swf>
+    </export>-->
+
+    <!-- Export a texture atlas from psd layers that we just made 
+    <export path="./BugTest2.png" >
+        <psd path="./BugTest.psd" origin="">
+       
+            <include layer="" />
+            <exclude layer="" />
+        </psd>
+    </export>-->
+    
+</swf2psd>
