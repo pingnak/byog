@@ -160,9 +160,8 @@
             <os family="windows" />
         </condition>
 		<sequential>
-			<echo>AIR Setup...</echo>
-			<!-- Air file mysteriously grows each time.  So delete it, first. -->
 			<delete file="${absolute.air}" />
+			<echo>AIR Setup...</echo>
 			<exec executable="adt" searchpath="true" vmlauncher="false" failonerror="true" >
 				<arg line="-package"/>
 				<arg line="-storetype ${air.cert.type}"/>
