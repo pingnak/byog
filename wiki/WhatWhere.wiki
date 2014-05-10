@@ -51,6 +51,6 @@ AS3 threading is sort of hackish, and very quirky.  This is the project for the 
 
 = Unity =
 
-This is still a stub.  I'm distracted with making an art export tool, to slurp things into Unity (and other more bitmap-y things), slightly more intact and consistently from Flash content.
+This is still a stub.  
 
 This will be the Unity implementation of the same beast, so I'll have a version of the SERVER that can run under Linux (SteamOS), and various other platforms that Adobe has spurned in their arrogance and apathy.  A tiny little UK company can support all of these platforms, but not a huge multinational, like Adobe, because it's 'too expensive' for Adobe to do anything but make buggy tools, like Flash, and fail by the numbers.
