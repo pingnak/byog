@@ -102,18 +102,17 @@ a:active { color:#20ffff; text-decoration: none; }
 #refresh_container { z-index: 4; display:none; }
 #game_container {
     /*overflow: hidden;*/
-    margin:0;
     height:100%; 
     z-index:2;
     display:none;
 }
-#spriteCanvas, #tileCanvas { 
+#spriteCanvas, #tileCanvas, #tileCanvas { 
     position:absolute;
     left:0px;
     top:0px;
     width:100%; 
     height:100%;
-
+    
     /* Try to let browser know not to SLOWLY turn our images into blurry smudges */
     image-rendering:optimizeSpeed;             /* Legal fallback */
     image-rendering:-moz-crisp-edges;          /* Firefox        */
@@ -121,6 +120,10 @@ a:active { color:#20ffff; text-decoration: none; }
     image-rendering:-webkit-optimize-contrast; /* Safari         */
     image-rendering:pixelated;                 /* CSS4 Proposed  */
     -ms-interpolation-mode:nearest-neighbor;   /* IE8+           */
+    
+}
+#uiCanvas {
+    z-index:4;
 }
 #spriteCanvas {
     z-index:3;
@@ -190,6 +193,9 @@ var PlaySound;      // Which version of sound playback function
 var audio;          // Audio object (HTML5 audio - fallback if Webkit audio not supported)
 var audiocontext;   // Webkit audio context 
 var audiosamples;   // Database of cached audio for webkit playback 
+
+var uicanvas;       // Where to UI elements
+var uicontext;      // What to UI with
 
 // Sprites
 // http://www.w3schools.com/html/html5_canvas.asp
@@ -264,137 +270,13 @@ function HandleInactiveTimeout()
 /**
  * Disable 'smoothing' on various modes of context
 **/
-function FixContext(contect)
+function FixContext(context)
 {
-    context['imageSmoothingEnabled'] = false;
-    context['mozImageSmoothingEnabled'] = false;
-    context['oImageSmoothingEnabled'] = false;
-    context['webkitImageSmoothingEnabled'] = false;
-    context['msImageSmoothingEnabled'] = false;
-}
-
-/**
- * Body.onload startup function
-**/
-function Startup()
-{
-    refresh_container = document.getElementById('refresh_container');
-    wait_container = document.getElementById('wait_container');
-    game_container = document.getElementById('game_container');
-    window.onerror = HandleWindowError; 
-
-    canvas= document.getElementById('spriteCanvas');
-    if( !canvas.getContext )
-    {
-        BrowserIsAncient(); // Really, really ancient...
-        return;
-    }
-
-    imagePool = new Array();
-    var nPool = 6;
-    while( 0 < nPool-- )
-    {
-        var img = new Image();
-        img._pendingProps = {};
-        imagePool.push(img);
-    }
-    
-    // Set up sprite layer
-    context = canvas.getContext("2d");
-    FixContext(context);
-    
-    // Set up tile layer
-    tilecanvas  = document.getElementById('tileCanvas');
-    tilecontext = tilecanvas.getContext("2d");
-    FixContext(tilecontext);
-    
-    // Attempt to use Webkit audio
-    try {
-        // Fix up for prefixing
-        window.AudioContext = window.AudioContext||window.webkitAudioContext;
-        audiocontext = new AudioContext();
-        audiosamples = new Object();
-
-        // Create a silent sample for audio to 'play' when the user taps for the first time.  Because iOS.
-        // We could add more, but that's specializing.
-        //PlayAudioWebKit("crunch.mp3");
-        CacheWebkitAudioB64("%SILENT_MP3%",silent_mp3);
-
-        // If we got this far, we probably have Webkit audio.
-        PlaySound = PlayAudioWebKit;
-    }
-    catch(e) {
-        log('Webkit Audio API is not supported in this browser... using HTML5 audio.\n'+e);
-        audiocontext = null;
-        PlaySound = PlayAudio;
-    }
-    audio = document.getElementById('mainAudio');
-    
-    // Test to see if audio can be muted - muted is writable
-    bMute = false;
-    document.getElementById('bmute').style.display="block";
-    document.getElementById('bplay').style.display="none";
-    
-    if( window.WebSocket )
-    {   // Start up Modern client
-        log("** WebSocket Mode");
-        SetContainer("wait_container");
-        
-        // Make a pool of these, or Chrome bleeds like a pig
-        websock = new WebSocket('ws://%IP%/pngstream?id=%SESSION%');
-        websock.onopen = HandleWebSockOpen; 
-        websock.onmessage = HandleWebSockMessage;
-        websock.onerror = HandleWebSockError; 
-        websock.onclose = HandleWebSockClose; 
-    }
-    else if( window.XMLHttpRequest )
-    {   // Fall back to long poll client
-        log("** Long Ping Mode");
-        SetContainer("wait_container");
-
-        // Attempt to make do with 'long poll' mode client.  It will 'work'. 
-        // For people who own junk with planned browser+OS obsolescence built in, 
-        // and are too poor/cheap/stubborn to upgrade to something modern.
-        websock = null;
-        xmlhttp = new XMLHttpRequest();
-        xmlhttp.onreadystatechange = LongPollAnswer;
-        LongPollAnswerHandler = HandleFirstLongPollAnswer;
-        LongPollRequest();
-    }
-    else
-    {
-        BrowserIsAncient();
-        return;
-    }
-
-    // Setup resize
-    if( fullscreenEnabled )
-    {
-        window.onresize = HandleResize;
-        window.onorientationchange = HandleResize;
-        setTimeout(HandleResize,100); // Chrome: Sizes we need for mouse not reported first time around
-    }
-
-    // set name of visibilityChangeHidden property and visibility change event
-    if(typeof document.hidden !== "undefined") {
-        visibilityChangeHidden = "hidden";
-        visibilityChange = "visibilitychange";
-    } else if(typeof document.mozHidden !== "undefined") {
-        visibilityChangeHidden = "mozHidden";
-        visibilityChange = "mozvisibilitychange";
-    } else if(typeof document.msHidden !== "undefined") {
-        visibilityChangeHidden = "msHidden";
-        visibilityChange = "msvisibilitychange";
-    } else if(typeof document.webkitHidden !== "undefined") {
-        visibilityChangeHidden = "webkitHidden";
-        visibilityChange = "webkitvisibilitychange";
-    } else {
-        log("No visibility API");
-        return;
-    }
-    document.addEventListener(visibilityChange, HandleVisibilityChange, false);
-    // Make sure we close the socket, even if the browser 'forgets'.
-    window.onbeforeunload = Shutdown;
+    context.imageSmoothingEnabled = false;
+    context.webkitImageSmoothingEnabled = false;
+    context.mozImageSmoothingEnabled = false;
+    context.oImageSmoothingEnabled = false;
+    context.msImageSmoothingEnabled = false;
 }
 
 /** Tell us about your old, old browser */
@@ -511,6 +393,7 @@ function HandleFirstLongPollAnswer()
     EnableUI();
     LongPollAnswerHandler = HandleLongPollAnswer;
 }
+
 /** Handle long poll data like websockets data, kinda-sorta */
 function HandleLongPollAnswer()
 {
@@ -537,6 +420,137 @@ function HandleLongPollAnswer()
     }
     xmlhttpAnswer = "";
 }
+
+/**
+ * Body.onload startup function
+**/
+function Startup()
+{
+    refresh_container = document.getElementById('refresh_container');
+    wait_container = document.getElementById('wait_container');
+    game_container = document.getElementById('game_container');
+    window.onerror = HandleWindowError; 
+
+    canvas= document.getElementById('spriteCanvas');
+    if( !canvas.getContext )
+    {
+        BrowserIsAncient(); // Really, really ancient...
+        return;
+    }
+
+    imagePool = new Array();
+    var nPool = 6;
+    while( 0 < nPool-- )
+    {
+        var img = new Image();
+        img._pendingProps = {};
+        imagePool.push(img);
+    }
+    
+    // Set up ui layer; infrequently updated, higher resolution content on top of everything else. 
+    uicanvas= document.getElementById('uiCanvas');
+    uicontext = uicanvas.getContext("2d");
+    FixContext(uicontext);
+
+    // Set up sprite layer; updated every frame
+    context = canvas.getContext("2d");
+    FixContext(context);
+    
+    // Set up tile layer; drawn from database of tiles
+    tilecanvas  = document.getElementById('tileCanvas');
+    tilecontext = tilecanvas.getContext("2d");
+    FixContext(tilecontext);
+    
+    // Attempt to use Webkit audio
+    try {
+        // Fix up for prefixing
+        window.AudioContext = window.AudioContext||window.webkitAudioContext;
+        audiocontext = new AudioContext();
+        audiosamples = new Object();
+
+        // Create a silent sample for audio to 'play' when the user taps for the first time.  Because iOS.
+        // We could add more, but that's specializing.
+        //PlayAudioWebKit("crunch.mp3");
+        CacheWebkitAudioB64("%SILENT_MP3%",silent_mp3);
+
+        // If we got this far, we probably have Webkit audio.
+        PlaySound = PlayAudioWebKit;
+    }
+    catch(e) {
+        log('Webkit Audio API is not supported in this browser... using HTML5 audio.\n'+e);
+        audiocontext = null;
+        PlaySound = PlayAudio;
+    }
+    audio = document.getElementById('mainAudio');
+    
+    // Test to see if audio can be muted - muted is writable
+    bMute = false;
+    document.getElementById('bmute').style.display="block";
+    document.getElementById('bplay').style.display="none";
+    
+    if( window.WebSocket )
+    {   // Start up Modern client
+        log("** WebSocket Mode");
+        SetContainer("wait_container");
+        
+        // Make a pool of these, or Chrome bleeds like a pig
+        websock = new WebSocket('ws://%IP%/pngstream?id=%SESSION%');
+        websock.onopen = HandleWebSockOpen; 
+        websock.onmessage = HandleWebSockMessage;
+        websock.onerror = HandleWebSockError; 
+        websock.onclose = HandleWebSockClose; 
+    }
+    else if( window.XMLHttpRequest )
+    {   // Fall back to long poll client
+        log("** Long Ping Mode");
+        SetContainer("wait_container");
+
+        // Attempt to make do with 'long poll' mode client.  It will 'work'. 
+        // For people who own junk with planned browser+OS obsolescence built in, 
+        // and are too poor/cheap/stubborn to upgrade to something modern.
+        websock = null;
+        xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = LongPollAnswer;
+        LongPollAnswerHandler = HandleFirstLongPollAnswer;
+        LongPollRequest();
+    }
+    else
+    {
+        BrowserIsAncient();
+        return;
+    }
+
+    // Setup resize
+    if( fullscreenEnabled )
+    {
+        window.onresize = HandleResize;
+        window.onorientationchange = HandleResize;
+        setTimeout(HandleResize,100); // Chrome: Sizes we need for mouse not reported first time around
+    }
+
+    // set name of visibilityChangeHidden property and visibility change event
+    if(typeof document.hidden !== "undefined") {
+        visibilityChangeHidden = "hidden";
+        visibilityChange = "visibilitychange";
+    } else if(typeof document.mozHidden !== "undefined") {
+        visibilityChangeHidden = "mozHidden";
+        visibilityChange = "mozvisibilitychange";
+    } else if(typeof document.msHidden !== "undefined") {
+        visibilityChangeHidden = "msHidden";
+        visibilityChange = "msvisibilitychange";
+    } else if(typeof document.webkitHidden !== "undefined") {
+        visibilityChangeHidden = "webkitHidden";
+        visibilityChange = "webkitvisibilitychange";
+    } else {
+        log("No visibility API");
+        return;
+    }
+    document.addEventListener(visibilityChange, HandleVisibilityChange, false);
+    // Make sure we close the socket, even if the browser 'forgets'.
+    window.onbeforeunload = Shutdown;
+}
+
+/** Just a dummy finction to eat callbacks */
 function Dummy() {}
 
 /** Ensure client is fully inert */
@@ -655,6 +669,42 @@ function HandleResize()
     }
 }
 
+/** Capture first 'touch', to give audio permission to play */
+function HandleFirstTouch(evt)
+{
+    if( PlayCachedAudioWebKit("%SILENT_MP3%") )
+    {
+        log("WebKit Audio Mode");
+    }
+    else
+    {
+        log("Web Audio Mode");
+        PlaySound = PlayAudio;
+        PlaySound("%SILENT_MP3%");
+    }
+    game_container.onmousedown = HandleMouseDown;
+    game_container.ontouchstart = HandleTouchStart;
+    HandleTouchStart(evt);
+}
+
+/** Capture first 'click', to give audio permission to play */
+function HandleFirstMouseDown(evt)
+{
+    if( PlayCachedAudioWebKit("%SILENT_MP3%") )
+    {
+        log("** WebKit Audio Mode");
+    }
+    else
+    {
+        log("** Web Audio Mode");
+        PlaySound = PlayAudio;
+        PlaySound("%SILENT_MP3%");
+    }
+    game_container.onmousedown = HandleMouseDown;
+    game_container.ontouchstart = HandleTouchStart;
+    HandleMouseDown(evt);
+}
+
 </script>
 </head>
 
@@ -671,6 +721,7 @@ function HandleResize()
     </audio>
     <canvas id="spriteCanvas" ></canvas>
     <canvas id="tileCanvas" ></canvas>
+    <canvas id="uiCanvas" ></canvas>
 </div>
 <!-- div layer for startup (should almost never be seen) -->
 <div id="wait_container">
@@ -745,7 +796,7 @@ function HandleWebSockMessageTxt( str )
             break;
         }
         break;
-    case "layr": // Sprite layer
+    case "layr": // Sprite/UI layer
         asplit = str.split(",");
         layer = asplit[1];
         pendingFrame = parseInt(asplit[2]);
@@ -754,7 +805,7 @@ function HandleWebSockMessageTxt( str )
         wide = parseInt(asplit[5]);
         high = parseInt(asplit[6]);
         break;
-    case "data":
+    case "data": // Image data is kept a separate message, to prevent a huge copy
         var s = str.substr(5,5);
         switch( s )
         {
@@ -779,7 +830,7 @@ function HandleWebSockMessageTxt( str )
             break;
         }
         break;
-    case "err:": // Error emulator in
+    case "err:": // Error emulator for long poll 'WebSockets' emulation
         TellUsToRefresh(str.slice(4));
         break;
     default:
@@ -938,10 +989,19 @@ function PlayAudio(data)
     if( bMute )
         return;
     var asplit = data.split(",");
-    audio.setAttribute("src","http://%IP%/"+asplit[2]+"?id=%SESSION%");
-    audio.setAttribute("type",asplit[1]);
-    audio.load();
-    audio.play();
+    var url="http://%IP%/"+asplit[2]+"?id=%SESSION%";
+    if( url != audio.getAttribute("src") )
+    {   // Set different URL
+        audio.setAttribute("src",url);
+        audio.setAttribute("type",asplit[1]);
+        audio.load();
+        audio.play();
+    }
+    else
+    {   // Reuse without setting; attempt to prevent de-caching sounds
+        audio.currentTime = 0;
+        audio.play();
+    }
 }
 
 /** Use WebKit audio to play a sound - caching and mixing works on tablets and such */
@@ -1050,10 +1110,10 @@ function HandleKeyPress(evt)
 /** Handle touch */
 function HandleTouchStart(evt)
 {
+    // http://www.w3.org/TR/touch-events/
     var touch = evt.touches[0];
-    var scale = canvas.width/window.innerWidth;
-    var mx = touch.clientX*scale;
-    var my = touch.clientY*scale;
+    var mx = touch.clientX;
+    var my = touch.clientY;
     var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
     trace("Touch: "+click);
     if( null != websock)
@@ -1067,31 +1127,12 @@ function HandleTouchStart(evt)
     EatEvent(evt);
 }
 
-/** Capture first 'touch', to give audio permission to play */
-function HandleFirstTouch(evt)
-{
-    if( PlayCachedAudioWebKit("%SILENT_MP3%") )
-    {
-        log("WebKit Audio Mode");
-    }
-    else
-    {
-        log("Web Audio Mode");
-        PlaySound = PlayAudio;
-        PlaySound("%SILENT_MP3%");
-    }
-    game_container.onmousedown = HandleMouseDown;
-    game_container.ontouchstart = HandleTouchStart;
-    HandleTouchStart(evt);
-}
-
 /** Handle click */
 function HandleMouseDown(evt) 
 {
     // http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-MouseEvent
-    var scale = canvas.width/window.innerWidth;
-    var mx = evt.clientX*scale;
-    var my = evt.clientY*scale;
+    var mx = evt.clientX;
+    var my = evt.clientY;
     var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
     trace("Mouse: "+click);
     if( null != websock)
@@ -1106,23 +1147,6 @@ function HandleMouseDown(evt)
     return false;
 }
 
-/** Capture first 'click', to give audio permission to play */
-function HandleFirstMouseDown(evt)
-{
-    if( PlayCachedAudioWebKit("%SILENT_MP3%") )
-    {
-        log("** WebKit Audio Mode");
-    }
-    else
-    {
-        log("** Web Audio Mode");
-        PlaySound = PlayAudio;
-        PlaySound("%SILENT_MP3%");
-    }
-    game_container.onmousedown = HandleMouseDown;
-    game_container.ontouchstart = HandleTouchStart;
-    HandleMouseDown(evt);
-}
 
 </script>
 

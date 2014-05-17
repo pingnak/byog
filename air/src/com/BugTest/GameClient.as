@@ -96,7 +96,13 @@ package com.BugTest
         
         /** Image worker */
         protected var bmClient : BitmapClient;
+        
+        /** Higher definition UI layer */
+        protected var bmUI : BitmapClient;
 
+        /** Current UI */
+        protected var uiCurr : Sprite;
+        
         /** An empty png image */
         protected var emptyPng : ByteArray;
         
@@ -114,6 +120,8 @@ package com.BugTest
         private var MS_REASONABLE_INVISIBILITY : uint = 30000;
         
         public var tiles : TileLayer;
+       
+        public var smProgress : FSMDObj;
         
         public function GameClient( cc : ClientConnection, friendly : String )
         {
@@ -174,6 +182,35 @@ package com.BugTest
             utils.SnapRect(pan);
             
             bReady = true;
+            
+            smProgress = new FSMDObj(this);
+            smProgress.state = FSM.IDLE;
+            //smProgress.state = "Welcome";
+        }
+
+        /**
+         * Start up welcome screen
+        **/
+        public function Welcome() : void
+        {
+            bmUI = new BitmapClient();
+            bmUI.InitWorker( WaitWelcomeReady, WorkerPackData.bPNG | WorkerPackData.bDelta | WorkerPackData.bTransparent | WorkerPackData.bMinimum | WorkerPackData.bBase64, 1 );
+            smProgress.state = FSM.IDLE;
+        }
+        /**
+         * Wait for resources to be available, to render UI layer
+        **/
+        public function WaitWelcomeReady() : void
+        {
+            
+        }
+
+        public function PickedPlane() : void
+        {
+        }
+        
+        public function Playing() : void
+        {
         }
         
         private static var game_clients : Array = new Array();
@@ -266,36 +303,40 @@ package com.BugTest
 
             // Orient our game to the current window shape
             clientAspect = wide/high;
+            var altScale : Number = 1;
             if( wide < high )
             {
-                clientScale = ARENA_SIZE / wide;
-                if( clientScale >= 1.0 )
-                {   // Really low resolution device... don't send more than it can display
-                    clientPan.width = wide;
-                    clientPan.height = high;
+                if( wide <= ARENA_SIZE )
+                {
                     clientScale = 1;
                 }
                 else
                 {
-                    clientPan.width = ARENA_SIZE;
-                    clientPan.height = Math.floor( high * clientScale );
+                    clientScale = ARENA_SIZE/wide;
+                    // Snap scaling value near 1/int
+                    altScale = 1/Math.ceil(wide/ARENA_SIZE);
+                    if( Math.abs(clientScale-altScale) < 0.1 )
+                        clientScale = altScale;
                 }
             }
             else
             {
-                clientScale = ARENA_SIZE / high;
-                if( clientScale >= 1.0 )
-                {   // Really low resolution device... don't send more than it can display
+                if( high <= ARENA_SIZE )
+                {
                     clientScale = 1;
-                    clientPan.height = high;
-                    clientPan.width = wide;
                 }
                 else
                 {
-                    clientPan.height = ARENA_SIZE;
-                    clientPan.width = Math.floor( wide * clientScale );
+                    clientScale = ARENA_SIZE/high;
+                    // Snap scaling value near 1/int
+                    altScale = 1/Math.ceil(high/ARENA_SIZE);
+                    if( Math.abs(clientScale-altScale) < 0.1 )
+                        clientScale = altScale;
                 }
             }
+            
+            clientPan.width = wide * clientScale;
+            clientPan.height = high * clientScale;
             clientPan = utils.RectCenterIn(clientPan,pan);
             utils.SnapRect(clientPan);
 
@@ -374,7 +415,7 @@ package com.BugTest
             {
                 // Record where things were, when this image was made
                 var mcBugs : MovieClip = Main.instance.mcBugs;
-                clickMap.SnapshotChildren( ++serverFrame, clientPan, 1/serverScale, mcBugs );
+                clickMap.SnapshotChildren( ++serverFrame, clientPan, serverScale, mcBugs );
             }
 
             return bmCurr;
@@ -559,6 +600,12 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
                 bmClient.Shutdown();
                 bmClient = null;
             }
+            if( null != bmUI )
+            {
+                bmUI.Shutdown();
+                bmUI = null;
+            }
+            
 
             var i : int;
             while( -1 != (i=game_clients.indexOf(this)) )

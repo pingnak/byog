@@ -178,7 +178,6 @@
 			<echo>Installing ${absolute.air}</echo>
 			<exec executable="${airappinstaller.path}" searchpath="true" vmlauncher="false" failonerror="true" >
 				<arg line="-silent"/>
-				<arg line="-eulaAccepted"/>
 				<arg line="-desktopShortcut"/>
 				<arg line="${absolute.air}" />
 			</exec>
