@@ -14,13 +14,13 @@
     
     <!-- A list of resources to make available through http -->
     <resources>
-        <file path="client/">404.html</file>
-        <file path="client/">404multi.html</file>
-        <file path="client/">client.html</file>
-        <file path="client/">favicon.png</file>
+        <file path="client/">client.html</file>     <!-- Client page -->
+        <file path="client/">404.html</file>        <!-- Not found page -->
+        <file path="client/">404multi.html</file>   <!-- Trying to load multiple times -->
+        <file path="client/">favicon.png</file>     <!-- A page icon -->
         <file path="client/">favicon.ico</file>
-        <file path="client/">crunch.mp3</file>
-        <file path="client/">silent.mp3</file>
+        <file path="client/">crunch.mp3</file>      <!-- The crunch noise -->
+        <file path="client/">silent.mp3</file>      <!-- A silent sample to play when first input happens -->
     </resources>
     
     <Client_Parameters>

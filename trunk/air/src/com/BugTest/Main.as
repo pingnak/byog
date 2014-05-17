@@ -156,7 +156,10 @@ package com.BugTest
             SortTabs(ui);
             addChild(ui);
             
-            stage.quality = StageQuality.LOW;
+            // Want aliased edges...
+            //stage.quality = StageQuality.LOW;
+            // Won't get any.
+            // http://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/flash/display/Stage.html#quality
             
             mcMask = ui.mcGameUI.mcMask;
             mcPlay = ui.mcGameUI.mcPlay;
