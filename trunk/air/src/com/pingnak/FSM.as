@@ -2,7 +2,6 @@
  * Class implementing generic FSM slave class
  *
  * This requires an object to hook into, which will serve as its master
- *  
 **/
 
 package com.pingnak
@@ -130,6 +129,7 @@ CONFIG::DEBUG { debug.Assert( stopFunc is Function ); }
         **/
         public function set state(idFunc : String) : void
         { 
+CONFIG::DEBUG { debug.Trace( "state:", this, fsm_this, fsm_state, "->", idFunc ); }
 CONFIG::DEBUG { debug.Assert( IDLE == idFunc || fsm_this[idFunc] is Function ); }
             var oldState : String = fsm_state;
             fsm_state = idFunc;
@@ -160,21 +160,23 @@ CONFIG::DEBUG { debug.Assert( IDLE == fsm_state || fsm_this[fsm_state] is Functi
         {
 // Invalid state function id 
 CONFIG::DEBUG { debug.Assert( fsm_this[fsm_state] is Function ); }
-
             if( IDLE == fsm_state )
             {   // Stop Heartbeat calls 
                 fsm_stop();
                 return;
             }
+CONFIG::DEBUG { fsm_this[fsm_state].call(fsm_this); }
+CONFIG::RELEASE {
             try
             {
                 fsm_this[fsm_state].call(fsm_this);
             }
             catch(e:Error)
-            {   // The app is probably thoroughly borked, but we caught the exception
+            {   // Something is borked, but we caught the exception
                 debug.TraceError("FSM.Heartbeat:",fsm_state,fsm_this,e);
                 fsm_state = IDLE;
             }
+}
         }
     
         /**
@@ -228,7 +230,7 @@ CONFIG::DEBUG { debug.Assert( IDLE == idFunc || fsm_this[idFunc] is Function ); 
         protected final function DefaultStart() : void
         {
             var i : int = fsm_all.indexOf(this);
-            if( -1 != i )
+            if( -1 == i )
             {
                 fsm_all.push(this);
             }

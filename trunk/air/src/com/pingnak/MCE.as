@@ -12,8 +12,8 @@ package com.pingnak
      *
      * One depends on MovieClip.addFrameScript, which could 'disappear' someday.
      *
-     * One does not, but has to poll the MovieClip constantly to detect change,
-     * even when a MovieClip is not animating.
+     * One does not, but will poll the MovieClip each frame to detect change,
+     * even when a MovieClip is not animating, since there's no way to ask.
      *
     **/
     public class MCE extends Event
@@ -21,22 +21,22 @@ package com.pingnak
         /**
          * Playback has started on 'label'
         **/
-        public static const LABEL_FIRST : String = "LABEL_FIRST";
+        public static const LABEL_FIRST : String = "label_first";
 
         /**
          * Last frame of a frame label has been reached
         **/
-        public static const LABEL_LAST : String = "LABEL_LAST";
+        public static const LABEL_LAST : String = "label_last";
         
         /**
          * First frame of clip
         **/
-        public static const FIRST : String = "FIRST";
+        public static const FIRST : String = "first";
 
         /**
          * Last frame of clip
         **/
-        public static const LAST : String = "LAST";
+        public static const LAST : String = "last";
         
 
         public function MCE( type : String )
@@ -66,7 +66,7 @@ CONFIG::DIKEIN
                 AddLabel(1,lastFrame)
             }
             else
-            {
+            {   // Run through labels backwards, so we have last fram from previous
                 while( 0 != labels.length ) 
                 {
                     var currlabel:FrameLabel = labels.pop();
@@ -102,26 +102,31 @@ CONFIG::DIKEIN
                     }
                 }
             }
+            /** Handler for first frame and its label */
             function EventFIRST() : void
             {
                 mc.dispatchEvent( new MCE(MCE.FIRST) );
                 if( null != mc.currentLabel )
                     mc.dispatchEvent( new MCE(MCE.LABEL_FIRST) );
             }
+            /** Handler for first frame of a labeled run of frames */
             function EventLABEL_FIRST() : void
             {
                 mc.dispatchEvent( new MCE(MCE.LABEL_FIRST) );
             }
+            /** Handler for last frame of clip */
             function EventLAST() : void
             {
                 if( null != mc.currentLabel )
                     mc.dispatchEvent( new MCE(MCE.LABEL_LAST) );
                 mc.dispatchEvent( new MCE(MCE.LAST) );
             }
+            /** Handler for last frame of a labeled run of frames */
             function EventLABEL_LAST() : void
             {
                 mc.dispatchEvent( new MCE(MCE.LABEL_LAST) );
             }
+            /** Handler for single frame clip */
             function EventOneFrame() : void
             {
                 if( mc.currentFrame == 1 )
@@ -187,7 +192,7 @@ CONFIG::DIKEOUT
                 var currlabel:FrameLabel = labels.pop();
                 if( currlabel.frame == lastFrame )
                 {
-                    triggers[currlabel.frame] = "BOTH";
+                    triggers[currlabel.frame] = "both";
                 }
                 else
                 {
@@ -223,7 +228,7 @@ CONFIG::DIKEOUT
                 }
                 if( undefined != which )
                 {
-                    if( "BOTH" == which )
+                    if( "both" == which )
                     {
                         mc.dispatchEvent( new MCE(LABEL_FIRST) );
                         mc.dispatchEvent( new MCE(LABEL_LAST) );
@@ -256,15 +261,17 @@ CONFIG::DIKEOUT
             return mc;
         }
 }
+
         /**
-         * Play a clip, then stop it (and disable it)
+         * Play a clip, then stop it
         **/
         public static function StopIt(e:Event):void
         {
             var mc : MovieClip = e.target as MovieClip;
             mc.stop();
-            MCE.Disable( mc );
+            mc.removeEventListener( MCE.LABEL_LAST, StopIt );
         }
+
 
         /**
          * Loop a clip
@@ -284,11 +291,6 @@ CONFIG::DIKEOUT
         {
             mc.gotoAndPlay(label);
             mc.addEventListener( MCE.LABEL_LAST, StopIt );
-            function StopIt(e:Event):void
-            {
-                mc.removeEventListener( MCE.LABEL_LAST, StopIt );
-                mc.stop();
-            }
         }
         
         /**

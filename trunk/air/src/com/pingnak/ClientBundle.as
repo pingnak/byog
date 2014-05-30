@@ -119,7 +119,6 @@ package com.pingnak
             cc.SESSION = SESSION;
             ClientBundles[SESSION] = this;
             clients[cc] = cc;
-trace("ClientBundle.New:",cc.SESSION,friendly);
             cc.DoomsDayCancel();
             bReady = true;
         }
@@ -257,7 +256,10 @@ CONFIG::DEBUG { debug.Trace("Was WebSocket..."); }
                 return false;
             }
             if( !cb.bReady )
+            {
+                cc.TraceError("Not ready.", cc.SESSION, str );
                 return false;
+            }
             return cb.WSReceivedTextMessage( cc, str );
         }
 
@@ -477,6 +479,11 @@ CONFIG::DEBUG { debug.ThrowAssert("Binary long poll mode disabled..."); }
             SESSION = "";
             
             resultAcc.clear();
+            
+            if( null != parent )
+            {
+                parent.removeChild(this);
+            }
         }
 
         /**

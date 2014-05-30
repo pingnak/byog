@@ -6,8 +6,10 @@
     Browser needs RFC 6455 WebSocket and recent Webkit/Canvas/Audio Support
     
     http://caniuse.com/#search=WebSocket
+    http://caniuse.com/#search=XMLHttpRequest
     http://caniuse.com/#search=Canvas
     http://caniuse.com/#search=Audio
+    http://caniuse.com/audio-api
     
     Neither are finalized standards, and still subject to change... and breakage,
     but hopefully they won't change enough to break this implementation.
@@ -16,12 +18,13 @@
     
     There are no external dependencies for the client.  What you see here is all of it.
     
-    The Server class cleans comments, trace/assert, etc. and extra white space up in 
-    release mode.  In that mode, looking at the client, it's a few, really long lines
-    with no code comments.
+    The Server cleans comments, trace/assert, etc. and extra white space up in 
+    release mode.  In that mode, looking at the client, it's a few, really long 
+    lines with no code or xml comments.
     
-    At runtime, certain values are inserted into the code by the server, so we don't
-    wait around doing more 'configuration' on the client side.
+    At runtime, certain values are inserted into the code by the server, so we 
+    don't wait around, loading things, to doing more 'configuration' on the 
+    client side.
 
     Generally speaking...
     
@@ -29,11 +32,14 @@
     
     * The body half is the dumb terminal client, based on that glue.
     
-    * We attempt to DETECT browser capabilities, rather than build an always outdated
-      database of what clients can support what.  In some cases, this leads to symptoms
-      and breakage.  It's unavoidable, whatever strategy you use.  I just elected to 
-      use the strategy that doesn't create a full-time 'keep the list updated' job.
-
+    * We attempt to DETECT browser capabilities, rather than build an always 
+    outdated database of what clients can support what. In some cases, this leads 
+    to symptoms and breakage. It's unavoidable, whatever strategy you use. I just 
+    elected to use the strategy that doesn't create a full-time 'keep the list 
+    updated' job.
+    
+    * My old C habits make me want to enumerate and make a binary protocol, but
+    javascript would just make that a mess.
 -->
 <head>
 <title>%TITLE%</title>
@@ -46,12 +52,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="apple-touch-icon" href="favicon.png">
-<!-- 
+<!--
     Debug console helper 
     Open http://jsconsole.com/
     Type listen: D91C3E56-5A48-4D69-B09D-589E66FDC387 into the gray box at the very top
     Console output will go there.
-    Type javascript commands and such, and they will bounce off the server
+    Type javascript commands and such, and they will bounce off the server and be sent to client
 <script src="http://jsconsole.com/remote.js?D91C3E56-5A48-4D69-B09D-589E66FDC387"></script>
 -->
 <!--DEBUG-->
@@ -73,7 +79,10 @@ a:visited { color:#00f0f0; text-decoration: none; }
 a:hover { color:#00ffff; text-decoration: underline; }
 a:active { color:#20ffff; text-decoration: none; }
 .popup, #wait_container, #refresh_container
-{   /* Several instances inherit our popup properties */
+{   /* 
+        Several windows inherit our popup properties 
+        Needless to say, behavior is inconsistent on older browsers
+    */
     /* http://css-tricks.com/centering-percentage-widthheight-elements/ */
     color: #f0f0f0;
 
@@ -120,10 +129,10 @@ a:active { color:#20ffff; text-decoration: none; }
     image-rendering:-webkit-optimize-contrast; /* Safari         */
     image-rendering:pixelated;                 /* CSS4 Proposed  */
     -ms-interpolation-mode:nearest-neighbor;   /* IE8+           */
-    
 }
 #uiCanvas {
     z-index:4;
+    display:none; /* Hidden/shown as needed*/
 }
 #spriteCanvas {
     z-index:3;
@@ -291,19 +300,48 @@ function HandleWindowError(msg, url, line)
     TellUsToRefresh("Error: "+msg+": "+url+":"+line);
 }
 
+/** Send ready callback to server, letting us know to carry on with operations */
+function SendReady()
+{
+    trace("SendReady()");
+    websock.send("ready");
+    depthGaugeID = setInterval(DepthGaugePing,%PING_FREQUENCY%);
+}
+
+/** Tell server what frame it's displaying */
+function DepthGaugePing()
+{
+    var frame = "frame,"+currentFrame+","+Date.now()+','+window.innerWidth+','+window.innerHeight;
+    WebSockSendStr(frame);
+}
+
 /** Socket open event */
 function HandleWebSockOpen( evt ) 
 {
     // Set up watchdog for stale refresh flooding 
-    depthGaugeID = setInterval(DepthGaugePing,%PING_FREQUENCY%);
+    WebSockSendStr = WebSockSend;
+
+    // Send initial client size, then send ready message
     DepthGaugePing();
-    EnableUI();
+    setTimeout(SendReady,100);
 }
 
 /** Socket close event */
 function HandleWebSockClose( evt ) 
 {
     TellUsToRefresh("Connection Closed " + evt.reason);
+}
+
+/** Wrap web socket send, to redirect to XMLHttpRequest url spew for older browsers*/
+var WebSockSendStr = WebSockSendDummy;
+function WebSockSendDummy( str ) {}
+function WebSockSend( str ) 
+{
+    websock.send(str);
+}
+function WebSockSendXMLHttp( str )
+{
+    xmlhttpUpload += '&'+str;
 }
 
 /** Handle what comes down from the server */
@@ -335,6 +373,7 @@ function HandleWebSockError()
 function HandleWebSockClose( evt ) 
 {
     TellUsToRefresh("Connection Closed "+evt.reason);
+    WebSockSendStr = WebSockSendDummy;
 }
 /**
  * Periodically POLL for long poll frames.
@@ -386,13 +425,6 @@ function LongPollAnswer()
     }
 }
 
-/** First response from long poll enables UI. */
-function HandleFirstLongPollAnswer()
-{
-    HandleLongPollAnswer();
-    EnableUI();
-    LongPollAnswerHandler = HandleLongPollAnswer;
-}
 
 /** Handle long poll data like websockets data, kinda-sorta */
 function HandleLongPollAnswer()
@@ -511,11 +543,15 @@ function Startup()
         websock = null;
         xmlhttp = new XMLHttpRequest();
         xmlhttp.onreadystatechange = LongPollAnswer;
-        LongPollAnswerHandler = HandleFirstLongPollAnswer;
+        WebSockSendStr = WebSockSendXMLHttp;
+        LongPollAnswerHandler = HandleLongPollAnswer;
+        xmlhttpUpload = "";
         LongPollRequest();
+        WebSockSendStr("ready");
     }
     else
-    {
+    {   // Not much long ping potential
+        // We could still add parameter spew to an image url, but performand is crap 
         BrowserIsAncient();
         return;
     }
@@ -567,6 +603,7 @@ function Shutdown()
         websock.close();
         websock = null;
     }
+    WebSockSendStr = WebSockSendDummy;
     if( 0 != depthGaugeID )
     {
         clearInterval( depthGaugeID );
@@ -709,11 +746,12 @@ function HandleFirstMouseDown(evt)
 </head>
 
 <body onload="Startup();" ontouchmove="EatEvent(event);" >
-<!-- I would love to use img.name{} css, but firefox is broken, and I would rather have working. visible buttons -->
+
+<!-- I would love to use img.name{} css, but firefox is broken, and these are only used once -->
 <button id="bmute" type="button" alt="Mute" onmousedown="javascript: audioMute(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEUAAAD////////////////////////////////////////////////////////////MzMwA//////8AAADy8vJmZmYMDAylpaXf39/S0tL7+/szMzO/v79/f3/V1dXv7+8ZGRkA7+/19fWysrJMTEw/Pz9ycnJZWVnb29uMjIwAb28Av78AHx+ZmZnPz88APz8Af3/o6OgALy8ADw/l5eUAj48A39/Y2Nji4uImJibr6+v4+PgAX18uIjDuAAAAEHRSTlMAn88fb39fv98Pjz/vry9P4hZ5IQAAAY9JREFUOI21U9l2glAMvIogbjVcNgVURHGptWqtVdv+/3c1CXgB9bXzAOcwQzLZhCigGTrD0MQTtBqmVDAbrXse6cllDIzxxZGmUaFf6vIwhBKGE9krBdG6yRnusArqRfr6z3uFHF19TCRrN0EvGJfIGB+uFwEMpJ7xfTko+OXRplc6x8en7HCC7kTRUfjxxYKZh0kgMblAqfz78e/UsrNIFOIsqVjTUem9k2WRYL4G36MvCVbyohwsjxsrE4yuADHlGEgNM1CJI9fF9FYuAG8G6Zr6JRuiFtDf9n5/mlpKkI7Adel70BZNtmBbCiRANhM4zf8SoIdwnQvamcnd7rVkEvvIZZLJrEx/uw3fNjfBOsZeQ15m0aiFx0GokwtwqdXcKGGqWc04CM8i4mGBQ9PSi2FxEBYsU3qOeVjlcVMQEmxpYfIAQhhyVShggRvlh8znC3O3cuwgyhzqammDATzgUCytaNXkg+IbW1BCTSbVw0lk9bREH09PeV3h6XWeHq/DwOM1Ho6Xo7SbjHb57z+Fkj4Y/Z6SiQAAAABJRU5ErkJggg==" /></button>
 <button id="bplay" type="button" alt="Play" onmousedown="javascript: audioPlay(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAA/FBMVEUAAAD////////////////////////////////////////////////////////////MzMwA////////AADy8vLff38AAADrTEzf39/S0tL7+/v1JibVpaWfX1/7DAzv7+/V1dXPv79fn5/19fUzMzMA7+/b29sZGRnPz88AHx/l5eXo6OjoWVnY2Nh/f3/i4uJycnKlpaUALy8Af38APz+ZmZlmZmYMDAwAj48Ab29ZWVnlZmYADw/r6+vvPz8A39/4+PiysrK/v78AX1+fPz9ff3+sTExfb2+4GRmfHx8Av7+fAAAPAADPAADPLy/vDw8vAADvAAAP7+9fAAAbMRMJAAAAEHRSTlMAn88fb39fv98Pjz/vr08vyllz3gAAAaRJREFUOMt9k+d6gjAUhuNCtNaeBATFWqmA1rqrrd1773H/99LkMALq4/cHyPeS5CxCpDJKDqVkyAoVsiqLpGYLiz63myMbUPZIZ6qSsLfSrFeDmGpNthnbJFNyBrCgtpWWx6ev92BJNkuFwKZlm5Vwfdjxn/2zKsv5fplVoa8FxOm5gU+TL+yzDTyg1AwWAG7dgysDok9HxQBZLVyadO48akQ+DJgIVtUh2PRxfkypAMzwQIdHssVv4OtZe6IIRD5UWYafIEIcHh25Bw2tJQDpQ41lScoSb8Z0euxRJN6kD2AVSR6vYFAUJxpxH/R8EuCE9gfrgJb29b0OaGmNz5/tJFD0LzmbnXjCp78fO9uJS/phTg4P3e4D9yl9r0tChCkTda+9eCIPu5IQiSJq0/+oaKbbfRWZlIQuqpXzi8V9gPH8xOO1CAkbi+WXG32AG7crqhkQuAEhCmuHPtcYOwqJoGGw5ermQkfu1i+jluNNa1WXm7Ynm5YUUmyJuOApiCnFnOTgOCw5WqTMR68dDQ0fvY2Vw6uj+PAqhVUDXi7mUcX43/8Lt0LLVkEZYAAAAABJRU5ErkJggg==" /></button>
-<button id="bfull" type="button" alt="Full" onmousedown="javascript: launchFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAh1BMVEUAAAD////////////////////////////////////////////////////////////MzMwAAABmZmb////y8vKZmZnf39/S0tK/v7/7+/vv7+/V1dVycnIzMzP19fWlpaXb29t/f38MDAzPz8/l5eXo6OgZGRnY2Nji4uKysrI/Pz/r6+v4+Ph2iCexAAAAEHRSTlMAn88fb39fv98Pjz+v708vIdemIwAAATNJREFUOMu9k9ViwzAMRR2GkmKFubS22/7/+yY74EDhbefNuTeSLWBMYdiWxDbYEzzTxRHX9JY6yfm9AElxD9G1Z/JBx2sCE5Ict5Mgxq6+wYI201V6/fcMKwrUBsM2K9KS86MSj5yXaYxWp+8xhjIgmkFPxYnDBTcywS4H4MEyAxmgduUDMXlluKF4rBuKpCeA72CkAvgq6XNNLznQDfp/Kt5TDfFiNCjDeRK0Y0yYoMm0DF4bIPOZE74zhM5/GPxPl/z4zK5QabMsVJP2hWIu9Yq6ScVVpabCn0S8UHTLet2sQjarb3cUPZT6iCJhkAEYs7F9OzDdyEWEiiBOauRoaLMYVlzV0DJPw5Xjh0owQcN6vjg1zleL7Wn12kFuafU2T5c3lNDy2qvllVF8R+JP//4Dk+I28wchU68AAAAASUVORK5CYII=" /></button>
-<button id="bback" type="button" alt="Back" onmousedown="javascript: exitFullscreen();return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAjVBMVEUAAAD////////////////////////////////////////////////////////////MzMwAAACZmZn///8zMzNmZmby8vLf39/S0tL7+/vV1dXv7+/19fXb29u/v7+ysrI/Pz/Pz8+lpaV/f39ycnLi4uLY2Njo6Ojl5eUMDAwZGRmMjIzr6+v4+PgmJia8QUr3AAAAEHRSTlMAn88fb39fv98Pjz+vL0/vKxzy0wAAAUJJREFUOI2Vk9dyg0AMRZde3ARi6WAbsB2n/f/nRSws3cnkvrAzOqiLsVGaaQiZGtuQo9s4yNadpZ3M2S0FofQWom3OzAcVHzFMFGe4nzjRTvkdFioSdQyvfl2XdgqEigT2SXrmS9UQodHZjxjBxVvJhzfciQCnDCAIFgF8AiC3RYEYvwLu2BZrh9ABbRgOUL57XtABkFMlB8qgA7yA8w96cx54PRChRhGuEuDSP5dAjDpTEuiB5wA0EoDEZVYogaqUQFlJILQmwLqK/wJ1Ja3nZgK4Q5IbVbRJ/lnmvFFnetfzRjE76wFqsXehGunz7IGwnZbxelipGFY37m9/rqYFhAPGTCx+XZhu5fyVxpWjpU0iWOkxLi1zFFwRn9SCiRTM54eT4/y02JFOr5Dmgk5vt3m8oRAdr7k6XuHFtYTc6d8/cHY4TyWtZDAAAAAASUVORK5CYII=" /></button>
+<button id="bfull" type="button" alt="Full" onmousedown="javascript: launchFullscreen(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAh1BMVEUAAAD////////////////////////////////////////////////////////////MzMwAAABmZmb////y8vKZmZnf39/S0tK/v7/7+/vv7+/V1dVycnIzMzP19fWlpaXb29t/f38MDAzPz8/l5eXo6OgZGRnY2Nji4uKysrI/Pz/r6+v4+Ph2iCexAAAAEHRSTlMAn88fb39fv98Pjz+v708vIdemIwAAATNJREFUOMu9k9ViwzAMRR2GkmKFubS22/7/+yY74EDhbefNuTeSLWBMYdiWxDbYEzzTxRHX9JY6yfm9AElxD9G1Z/JBx2sCE5Ict5Mgxq6+wYI201V6/fcMKwrUBsM2K9KS86MSj5yXaYxWp+8xhjIgmkFPxYnDBTcywS4H4MEyAxmgduUDMXlluKF4rBuKpCeA72CkAvgq6XNNLznQDfp/Kt5TDfFiNCjDeRK0Y0yYoMm0DF4bIPOZE74zhM5/GPxPl/z4zK5QabMsVJP2hWIu9Yq6ScVVpabCn0S8UHTLet2sQjarb3cUPZT6iCJhkAEYs7F9OzDdyEWEiiBOauRoaLMYVlzV0DJPw5Xjh0owQcN6vjg1zleL7Wn12kFuafU2T5c3lNDy2qvllVF8R+JP//4Dk+I28wchU68AAAAASUVORK5CYII=" /></button>
+<button id="bback" type="button" alt="Back" onmousedown="javascript: exitFullscreen(); return false;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAjVBMVEUAAAD////////////////////////////////////////////////////////////MzMwAAACZmZn///8zMzNmZmby8vLf39/S0tL7+/vV1dXv7+/19fXb29u/v7+ysrI/Pz/Pz8+lpaV/f39ycnLi4uLY2Njo6Ojl5eUMDAwZGRmMjIzr6+v4+PgmJia8QUr3AAAAEHRSTlMAn88fb39fv98Pjz+vL0/vKxzy0wAAAUJJREFUOI2Vk9dyg0AMRZde3ARi6WAbsB2n/f/nRSws3cnkvrAzOqiLsVGaaQiZGtuQo9s4yNadpZ3M2S0FofQWom3OzAcVHzFMFGe4nzjRTvkdFioSdQyvfl2XdgqEigT2SXrmS9UQodHZjxjBxVvJhzfciQCnDCAIFgF8AiC3RYEYvwLu2BZrh9ABbRgOUL57XtABkFMlB8qgA7yA8w96cx54PRChRhGuEuDSP5dAjDpTEuiB5wA0EoDEZVYogaqUQFlJILQmwLqK/wJ1Ja3nZgK4Q5IbVbRJ/lnmvFFnetfzRjE76wFqsXehGunz7IGwnZbxelipGFY37m9/rqYFhAPGTCx+XZhu5fyVxpWjpU0iWOkxLi1zFFwRn9SCiRTM54eT4/y02JFOr5Dmgk5vt3m8oRAdr7k6XuHFtYTc6d8/cHY4TyWtZDAAAAAASUVORK5CYII=" /></button>
 
 <!-- div layer for game -->
 <div id="game_container">
@@ -723,10 +761,12 @@ function HandleFirstMouseDown(evt)
     <canvas id="tileCanvas" ></canvas>
     <canvas id="uiCanvas" ></canvas>
 </div>
+
 <!-- div layer for startup (should almost never be seen) -->
 <div id="wait_container">
     <h1>Please wait...</h1>
 </div>
+
 <!-- div layer after disconnect -->
 <div id="refresh_container">
     <h1>SOMETHING BROKE</h1>
@@ -748,6 +788,14 @@ function EnableUI()
     game_container.onmousedown = HandleFirstMouseDown;
     game_container.ontouchstart = HandleFirstTouch;
     window.onkeypress = HandleKeyPress;
+}
+
+function DisableUI()
+{
+    // Enable mouse+keyboard inputs
+    game_container.onmousedown = null;
+    game_container.ontouchstart = null;
+    window.onkeypress = null;
 }
 
 
@@ -796,6 +844,7 @@ function HandleWebSockMessageTxt( str )
             break;
         }
         break;
+        
     case "layr": // Sprite/UI layer
         asplit = str.split(",");
         layer = asplit[1];
@@ -805,6 +854,7 @@ function HandleWebSockMessageTxt( str )
         wide = parseInt(asplit[5]);
         high = parseInt(asplit[6]);
         break;
+        
     case "data": // Image data is kept a separate message, to prevent a huge copy
         var s = str.substr(5,5);
         switch( s )
@@ -830,9 +880,31 @@ function HandleWebSockMessageTxt( str )
             break;
         }
         break;
-    case "err:": // Error emulator for long poll 'WebSockets' emulation
+
+    /*
+       This is a generic depth guage.  Just return the packet.
+       This allows us to measure when contents have been received by client, so 
+       we can trigger state on the server knowing that something like the tiles,
+       or a UI page has fully been downloaded.  This should probably include a 
+       random number so that the answer isn't 'faked', to trigger bugs, or used
+       by bots.
+    */ 
+    case "derp":
+        WebSockSendStr(str);
+        break;
+
+    case "uion":
+        EnableUI();
+        break;
+
+    case "uoff":
+        DisableUI();
+        break;
+        
+    case "err:": // Error emulator for long poll 'WebSockets' close emulation
         TellUsToRefresh(str.slice(4));
         break;
+        
     default:
         TellUsToRefresh("Unhandled top level:"+evt.data);
         break;
@@ -1074,20 +1146,6 @@ function PlayCachedAudioWebKit(src)
     return true;
 }
 
-/** Tell server what frame it's displaying */
-function DepthGaugePing()
-{
-    var frame = "frame,"+currentFrame+","+Date.now()+','+window.innerWidth+','+window.innerHeight;
-    if( null != websock)
-    {
-        websock.send( frame );
-    }
-    else
-    {
-        xmlhttpUpload += '&'+frame;
-    }
-}
-
 /** Handle key press */
 function HandleKeyPress(evt) 
 {   // Why is this so... bad? http://unixpapa.com/js/key.html
@@ -1100,10 +1158,7 @@ function HandleKeyPress(evt)
         return;
     var key = "key,"+currentFrame+","+char+","+evt.shiftKey+","+evt.ctrlKey;
     trace("Key: "+key);
-    if( null != websock )
-        websock.send(key);
-    else
-        xmlhttpUpload += '&'+key;
+    WebSockSendStr(key);
     return false;
 }
 
@@ -1115,15 +1170,7 @@ function HandleTouchStart(evt)
     var mx = touch.clientX;
     var my = touch.clientY;
     var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
-    trace("Touch: "+click);
-    if( null != websock)
-    {
-        websock.send(click);
-    }
-    else
-    {
-        xmlhttpUpload += '&'+click;
-    }
+    WebSockSendStr(click);
     EatEvent(evt);
 }
 
@@ -1134,15 +1181,7 @@ function HandleMouseDown(evt)
     var mx = evt.clientX;
     var my = evt.clientY;
     var click = "click,"+currentFrame+","+Math.floor(mx)+","+Math.floor(my)+","+evt.shiftKey+","+evt.ctrlKey;
-    trace("Mouse: "+click);
-    if( null != websock)
-    {
-        websock.send(click);
-    }
-    else
-    {
-        xmlhttpUpload += '&'+click;
-    }
+    WebSockSendStr(click);
     EatEvent(evt);
     return false;
 }

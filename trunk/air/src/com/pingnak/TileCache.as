@@ -51,7 +51,7 @@ package com.pingnak
         public var TILE_HIGH : int = 50;
 
         /** Reduce the number of tiles to throw at the client at the same time */
-        public static const MAX_TILES_FRAME : int = 3;
+        public static const MAX_TILES_FRAME : int = 2;
         
         protected var id : String;
         protected var bm : BitmapData;
