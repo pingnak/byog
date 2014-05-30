@@ -26,15 +26,19 @@ package com.pingnak
             instance = this;
 
             // Keep kicking the random number generator
-            addEventListener( Event.ENTER_FRAME, Entropy );
+            addEventListener( Event.ENTER_FRAME, HouseKeeping );
         }
 
         /**
-         * Keep random output inconsistent
+         * Do regular house keeping tasks
         **/
-        internal function Entropy(e:Event=null):void
+        internal function HouseKeeping(e:Event=null):void
         {
+            // Keep random output consistently inconsistent
             Math.random();
+            
+            // Give generic state their heartbeats
+            FSM.Cycle();
         }
         
         /** Get check box state */

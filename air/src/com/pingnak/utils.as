@@ -4,9 +4,9 @@ package com.pingnak
     import flash.system.*;
     import flash.utils.*;
     import flash.events.*;
+    	import flash.display.*;
     	import flash.filesystem.*;
     	import flash.geom.*;
-    import flash.debugger.enterDebugger;
     
     public class utils
     {
@@ -21,175 +21,6 @@ package com.pingnak
         {
             return (new Date()).time;
         }
-        
-        /**
-         * Converts a Date object to a human readable double precision time 
-         * 20140405190129.03 = 2014/04/05 19:01:29, 30ms
-         *
-         * We waste 33 bits of 52 bits of precision, leaving 19 bits of year vs fractions of seconds in mantissa
-         * 2^52 = 4503599627370496 log2(10000000000)=33 bits (second resolution), 
-         * 450359 9627370496
-         *   2014 0405190129 (seconds)
-         * 2014 040519012900 (fractional seconds lose precision before millisecond range)
-         *
-         * 1/100th of a second gives us adequate resolution, down to frames, since the server runs at 30fps
-         *
-         * Makes a more or less functionally equivalent time stamp to 'milliseconds +/- 1970' epoch, for
-         * indexing/sorting/etc., but it's readable.  Add '.toFixed(2)', to pretty print.
-         * 
-         * Though these stamps can't be added/subtracted directly, unlike a 'milliseconds since' value,  
-         * this result can be verified to be 'valid looking'.
-         *
-         * As long as Number converts to 'long double', some time within the next 2000 years, this should be fine.
-         * 
-         * @param date Optional date object to specify time; else 'now'.
-         * @return Human readable, UTC double precision floating point value
-        **/
-        public static function DoubleTime( date : Date = null ) : Number
-        {
-            if( null == date )
-            {
-                date = new Date();
-            }
-            return  (date.getUTCFullYear()  * 10000000000) + 
-                    ((1+date.getUTCMonth()) * 100000000)+
-                    (date.getUTCDate()      * 1000000)+
-                    (date.getUTCHours()     * 10000)+
-                    (date.getUTCMinutes()   * 100)+
-                    (date.getUTCSeconds())+
-                    Math.floor(date.getUTCMilliseconds()*0.001);
-        }
-
-        /**
-         * Get year from a DoubleTime number
-         * @param Number formatted with DoubleTime
-         * @return Year, from trillions of years before the big bang, to trillions of years past the evaporation of all matter, without losing precision
-        **/
-        public static function DoubleTimeYear( dt : Number ) : Number
-        {
-            return Math.floor(0.0000000001 * dt);
-        }
-        
-        /**
-         * Get Month (1..12)
-         * @param Number formatted with DoubleTime
-         * @return Month; 1-12
-        **/
-        public static function DoubleTimeMonth( dt : Number ) : uint
-        {
-            return int(0.00000001 * dt) % 100;
-        }
-        
-        /**
-         * Get Day (1..31)
-         * @param Number formatted with DoubleTime
-         * @return Day of Month; 1-31
-        **/
-        public static function DoubleTimeDay( dt : Number ) : uint
-        {
-            return int(0.000001 * dt) % 100;
-        }
-        
-        /**
-         * Get Hour (0..23)
-         * @param Number formatted with DoubleTime
-         * @return Hour of day, in 24 hour time (0..23)
-        **/
-        public static function DoubleTimeHour( dt : Number ) : uint
-        {
-            return int(0.0001 * dt) % 100;
-        }
-        
-        /**
-         * Get Minutes (0..59)
-         * @param Number formatted with DoubleTime
-         * @return Minute of hour (0..59)
-        **/
-        public static function DoubleTimeMinute( dt : Number ) : uint
-        {
-            return int(0.01 * dt) % 100;
-        }
-        
-        /**
-         * Get seconds (0..59)
-         * @param Number formatted with DoubleTime
-         * @return Seconds (0..59)
-        **/
-        public static function DoubleTimeSecond( dt : Number ) : uint
-        {
-            return Math.floor(dt) % 100;
-        }
-        
-        /**
-         * Get fractional seconds, to whatever precision is available
-         * @param Number formatted with DoubleTime
-         * @return 0..(1-epsilon) 
-        **/
-        public static function DoubleTimeFraction( dt : Number ) : Number
-        {
-            return dt - Math.floor(dt);
-        }
-
-        /**
-         * Check if DoubleTime value is valid-looking, and probably DoubleTime value
-         * @param dt The kind of value DoubleTime makes - we assume
-         * @param minYear Minimum year allowable (default to 10ms precision minimum year)
-         * @param maxYear Maximum year allowable (default to 10ms precision maximum year)
-        **/
-        public static function IsDoubleTime( dt : Number, minYear : Number = -4500, maxYear : Number = 4500 ) : Boolean
-        {
-            var year : Number = Math.floor(0.0000000001 * dt);
-            dt = Math.abs(dt);
-            var month : int = int(0.00000001 * dt) % 100;
-            var day   : int = int(0.000001 * dt) % 100;
-            var hour  : int = int(0.0001 * dt) % 100;
-            var minute: int = int(0.01 * dt) % 100;
-            var second: int = int(dt) % 100;
-            
-            // Though 0 == 1BCE in astronomical calculations, calendars started at 1CE, and 1BCE.  Use '0' as check for completeness.
-            return 60 > second && 60 > minute && 24 > hour && 0 < day && 31 >= day && 0 < month && 12 >= month && 0 != year && minYear <= year && maxYear >= year;
-        }
-        
-        /**
-         * Converts a DoubleTime GMT value back to Date format, for further formatting
-         * @param dt The kind of value DoubleTime makes
-        **/
-        public static function DateFromDoubleTimeUTC( dt : Number ) : Date
-        {
-CONFIG::DEBUG { debug.Assert( IsDoubleTime(dt) ); }
-            var year : Number = Math.floor(0.0000000001 * dt);
-            dt = Math.abs(dt);
-            var month : int = int(0.00000001 * dt) % 100;
-            var day   : int = int(0.000001 * dt) % 100;
-            var hour  : int = int(0.0001 * dt) % 100;
-            var minute: int = int(0.01 * dt) % 100;
-            var second: int = int(dt) % 100;
-            var fraction : Number = dt-Math.floor(dt);
-
-            var date : Date = new Date();
-            date.setUTCFullYear( year, month-1, day );
-            date.setUTCHours( hour, minute, second, 1000*fraction );
-            return date;
-        }
-
-        /**
-         * Converts a DoubleTime local value back to Date format, for further formatting
-         * @param dt The kind of value DoubleTime makes
-        **/
-        public static function DateFromDoubleTime( dt : Number ) : Date
-        {
-CONFIG::DEBUG { debug.Assert( IsDoubleTime(dt) ); }
-            var year : Number = Math.floor(0.0000000001 * dt);
-            dt = Math.abs(dt);
-            var month : int = int(0.00000001 * dt) % 100;
-            var day   : int = int(0.000001 * dt) % 100;
-            var hour  : int = int(0.0001 * dt) % 100;
-            var minute: int = int(0.01 * dt) % 100;
-            var second: int = int(dt) % 100;
-            var fraction : Number = dt-Math.floor(dt);
-            return new Date(year, month-1, day, hour, minute, second, 1000*fraction );
-        }
-        
         
         /**
          * Encode data to Base64 format, from current byteArray seek position
@@ -465,11 +296,21 @@ CONFIG::DEBUG { debug.Assert( IsDoubleTime(dt) ); }
         {
             rect.x = Math.floor(rect.x);
             rect.y = Math.floor(rect.y);
-            rect.width = Math.floor(rect.width+0.5);
-            rect.height = Math.floor(rect.height+0.5);
+            rect.width = Math.ceil(rect.width);
+            rect.height = Math.ceil(rect.height);
             return rect;
         }
 
+        /** Scale a rectangle */
+        public static function RectScale( rect : Rectangle, scale : Number ) : Rectangle
+        {
+            rect.x *= scale;
+            rect.y *= scale;
+            rect.width *= scale;
+            rect.height *= scale;
+            return rect;
+        }
+        
         /** Snap a rectangle to integer boundaries */
         public static function SnapPoint( pt : Point ) : Point
         {
@@ -553,6 +394,138 @@ CONFIG::DEBUG { debug.Assert( IsDoubleTime(dt) ); }
             }
             return a;
         }
+        
+        /**
+         * Perform a breadth-first callback of display objects
+         * This finds everything in order, from lowest depth, to topmost.
+         *
+         * @param dobj Start of DisplayObject tree search 
+         * @param callback Function() : Boolean - return true to stop at current display object
+         * @return DisplayObject that callback stopped at, or null if we recursed all and didn't find it
+        **/
+        public static function DObjBreadthFirst( dobj : DisplayObject, callback : Function ) : DisplayObject
+        {
+CONFIG::DEBUG { debug.Assert( null != dobj ); }
+CONFIG::DEBUG { debug.Assert( null != callback ); }
+            var dCurr : DisplayObject;
+            var dContain : DisplayObjectContainer;
+            var i : int;
+            var fifo : Array = new Array();
+            fifo.push(dobj);
+            while( 0 != fifo.length )
+            {
+                dCurr = fifo.shift(); // Remove earliest entries, first
+                if( callback(dCurr) )
+                    return dCurr;
+                if( dCurr is DisplayObjectContainer )
+                {
+                    dContain = dCurr as DisplayObjectContainer;
+                    for( i = 0; i < dContain.numChildren; ++i )
+                    {
+                        fifo.push(dContain.getChildAt(i));
+                    }
+                }
+            }
+            return null;
+        }
+        
+        /**
+         * Perform a recursive, depth-first callback of display objects
+         * @param dobj Start of DisplayObject tree search 
+         * @param callback Function() : Boolean - return true to stop at current display object
+         * @return DisplayObject that callback stopped at, or null if we recursed all and didn't find it
+        **/
+        public static function DObjDepthFirst( dobj : DisplayObject, callback : Function ) : DisplayObject
+        {
+CONFIG::DEBUG { debug.Assert( null != dobj ); }
+CONFIG::DEBUG { debug.Assert( null != callback ); }
+            var dContain : DisplayObjectContainer;
+            var dCurr : DisplayObject;
+            var i : int;
+            if( dobj is DisplayObjectContainer )
+            {
+                dContain = dobj as DisplayObjectContainer;
+                for( i = 0; i < dContain.numChildren; ++i )
+                {
+                    dCurr = DObjDepthFirst(dContain.getChildAt(i),callback);
+                    if( null != dCurr )
+                        return dCurr;
+                }
+            }
+            if( callback(dobj) )
+                return dobj;
+            return null;
+        }
+
+        /**
+         * Find a DisplayObject by name
+         * 
+         * This is the naiive case for finding things in a MovieClip that doesn't
+         * have multiple copies of things to confuse a search for something.
+         *
+         * @param dobj Start of DisplayObject tree search 
+         * @param label Name of object to find
+         * @return DisplayObject that matched, or null if we didn't find it
+        public static function DObjFind( dobj : DisplayObject, label : String ) : DisplayObject
+        {
+            function foundIt(dobj:DisplayObject) : Boolean
+            {
+                return dobj.name == label;
+            }
+            return DObjBreadthFirst( dobj, foundIt );
+        }
+        **/
+        
+        /**
+         * Find a DisplayObject by hinted '.' path
+         *
+         * Basically, if we re-arrange the contents of a MovieClip, this will 
+         * tend to find children of children without worrying overmuch about the 
+         * absolute path to them, or naming every step to find them, such as 
+         * reuse cases for a MovieClip.
+         *
+         * In the case where we have mc.balloon.moo.face.(unnamed).skeleton.hotpt...
+         *      DObjFind(mc,"moo") would find 'moo'
+         *      DObjFind(mc,"moo.hotpt") would find 'moo', then find 'hotpt' in moo.
+         *
+         * We do this because more than one thing might have 'hotpt' in it, so we
+         * need to be somewhat specific for those cases.
+         *
+         * @param dobj Start of DisplayObject tree search 
+         * @param label Name of object to find
+         * @return DisplayObject that matched, or null if we didn't find it
+        **/
+        public static function DObjFindPath( dobj : DisplayObject, label : String ) : DisplayObject
+        {
+            var asplit : Array = label.split('.');
+            var labelcurr : String;
+            while( asplit.length )
+            {
+                labelcurr = asplit.shift();
+                dobj = DObjBreadthFirst( dobj, foundIt );
+                if( null == dobj )
+                    return null;
+            }
+            function foundIt(dobjCurr:DisplayObject) : Boolean
+            {
+                return dobjCurr.name == labelcurr;
+            }
+            return dobj;
+        }
+
+        /**
+         * Find a MovieClip in dobj, and put consistent debug checking here.
+         * @param dobj Start of DisplayObject tree search 
+         * @param label Name of object to find
+         * @return MovieClip with DObjFindPath; cast to MovieClip and assert success
+        **/
+        public static function FindMC( dobj : DisplayObject, label : String ) : MovieClip
+        {
+            var ret : MovieClip = DObjFindPath(dobj,label) as MovieClip;
+            // We want to 'guarantee' a result; null will still be a crash in release mode, if you let it go that far 
+CONFIG::DEBUG { debug.Assert( null != ret ); }
+            return ret;
+        }
     }
 }
-    
+   

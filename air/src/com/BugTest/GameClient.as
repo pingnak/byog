@@ -41,7 +41,6 @@ package com.BugTest
         public var ARENA_SIZE : int = 720;
         public var ARENA_MID : int = 360;
         
-        
         /** Logical position, within main game */
         internal var pan : Rectangle;
 
@@ -76,8 +75,6 @@ package com.BugTest
         /** Map of frames we've generated, and sent down to client, with 'old' positions of things */
         internal var clickMap : ClickMap;
         
-        internal var lp_requests : Array;
-
         protected const DROP_FRAME_THRESHOLD : int = 6; 
         protected const ADD_FRAME_THRESHOLD : int = 2; 
         protected var vScale : Number = 1;
@@ -97,21 +94,15 @@ package com.BugTest
         /** Image worker */
         protected var bmClient : BitmapClient;
         
-        /** Higher definition UI layer */
-        protected var bmUI : BitmapClient;
-
-        /** Current UI */
-        protected var uiCurr : Sprite;
-        
-        /** An empty png image */
-        protected var emptyPng : ByteArray;
-        
-        protected var baPool : ByteArrayPool;
+        /** Derp validation */
+        protected var derpLut : Array;
+        /** Derp sequence for validation */
+        protected var derpSeq : int;
         
         internal var airplane_speed : Number = 2;
         internal var airplane : MovieClip;
         internal var target_angle : Number;
-        
+
         /** 
          * Timer for inactivity cleanup
          * Browsers open a whole BUNCH of sockets, and then don't use them.
@@ -121,7 +112,7 @@ package com.BugTest
         
         public var tiles : TileLayer;
        
-        public var smProgress : FSMDObj;
+        public var smProgress : FSM;
         
         public function GameClient( cc : ClientConnection, friendly : String )
         {
@@ -142,12 +133,8 @@ package com.BugTest
             long_poll_id = String(Server.instance.xml.Client_Parameters.LONG_POLL_XML);
             
             clickMap = new ClickMap();
-            lp_requests = new Array();
-
-            emptyPng = Main.instance.GetResource("empty.png");
 
             // A pool of work memory
-            baPool = new ByteArrayPool(3,false,false);
             MAX_REFRESH_DEPTH = 1+Main.instance.stage.frameRate;
 
             // Add to active game clients
@@ -169,195 +156,24 @@ package com.BugTest
             DoomsDayPostpone();
             clientReceptionTime = clientConnectionTime = (new Date()).getTime();
             
-            airplane = applet.GetMovieClip("Airplane");
-            const airplanes : Array = utils.Shuffle( [1,2,3,4,5,6,7,8,9] );
-            var iAirplane : int = airplanes.shift();
-            airplanes.push(iAirplane);
-            Main.instance.mcPlay.addChild(airplane);
-            airplane.gotoAndStop( iAirplane );
-            airplane.x = (Main.instance.GameWide * 0.25) + int(Main.instance.GameWide * 0.5 * Math.random());
-            airplane.y = (Main.instance.GameHigh * 0.25) + int(Main.instance.GameHigh * 0.5 * Math.random());
-            target_angle = airplane.rotation = 360 * Math.random();
-            utils.RectCenterPt( pan, airplane.x, airplane.y );
-            utils.SnapRect(pan);
-            
             bReady = true;
-            
-            smProgress = new FSMDObj(this);
+            derpLut = new Array();
+            derpSeq = 1;
+            smProgress = new FSM(this);
+        }
+
+        /**
+         * The client sent its first "ready" message.  
+        **/
+        public function HaveClient() : void
+        {
+trace("HaveClient");
+            if( null == bmClient )
+            {
+                bmClient = new BitmapClient();
+                bmClient.InitWorker( InitializedWorker, WorkerPackData.bPNG | WorkerPackData.bTransparent | WorkerPackData.bMinimum | WorkerPackData.bBase64, 1 );
+            }
             smProgress.state = FSM.IDLE;
-            //smProgress.state = "Welcome";
-        }
-
-        /**
-         * Start up welcome screen
-        **/
-        public function Welcome() : void
-        {
-            bmUI = new BitmapClient();
-            bmUI.InitWorker( WaitWelcomeReady, WorkerPackData.bPNG | WorkerPackData.bDelta | WorkerPackData.bTransparent | WorkerPackData.bMinimum | WorkerPackData.bBase64, 1 );
-            smProgress.state = FSM.IDLE;
-        }
-        /**
-         * Wait for resources to be available, to render UI layer
-        **/
-        public function WaitWelcomeReady() : void
-        {
-            
-        }
-
-        public function PickedPlane() : void
-        {
-        }
-        
-        public function Playing() : void
-        {
-        }
-        
-        private static var game_clients : Array = new Array();
-        public static function get LiveUsers() : int
-        {
-            return game_clients.length;
-        }
-
-        
-        /**
-         * We've fully received and decoded incoming data in 'Message'.  
-         * Do something with it.
-        **/
-        override public function WSReceivedTextMessage( cc : ClientConnection, str : String ) : Boolean
-        {
-            DoomsDayPostpone();
-            var aParts : Array = str.split(',');
-            //CONFIG::DEBUG { if( "frame" != aParts[0] ) trace("WSReceivedTextMessage:",str); }
-            var wide : int;
-            var high : int;
-            switch(aParts.shift())
-            {
-            case "frame":   // Just sending frame number to track lag
-                clientFrame = int(aParts[0]);
-                clientReceptionTime = Number(aParts[1]);
-                wide = int(aParts[2]);
-                high = int(aParts[3]);
-                if( wide <= 0 || high <= 0 || wide > 8192 || high > 8192 )
-                {
-                    WSSendError( cc, "Bad Size:"+wide+','+high,1003);
-                    return false;
-                }
-                var diff : int = serverFrame - clientFrame;
-                if( diff < 0 ) // (diff == 0) would be remarkable...
-                {
-                    WSSendError( cc, "Time Traveller Detected: "+serverFrame+"/"+clientFrame,1003);
-                    return false;
-                }
-                /*
-                Needs to be average fps
-                if( diff >= DROP_FRAME_THRESHOLD )
-                {   // If the client is falling behind, drop some resolution
-                    vScale *= 0.90;
-                    if( vScale < 0.5 )
-                        vScale = 0.5;
-                    CalcLayers(clientWidth,clientHeight);
-                }
-                else if( diff < ADD_FRAME_THRESHOLD )
-                {   // If the client is kicking butt, add some more resolution, but more slowly than we subtract
-                    vScale *= 1.05;
-                    if( vScale > 1 )
-                        vScale = 1;
-                    CalcLayers(clientWidth,clientHeight);
-                }
-                */
-                CalcLayers( wide, high );
-                ccmain = cc;
-                if( null == bmClient )
-                {
-                    bmClient = new BitmapClient();
-                    bmClient.InitWorker( InitializedWorker, WorkerPackData.bPNG | WorkerPackData.bTransparent | WorkerPackData.bMinimum | WorkerPackData.bBase64, 1 );
-                }
-                break;
-
-            case "click":
-                Click(uint(aParts[0]),parseFloat(aParts[1]),parseFloat(aParts[2]),utils.parseBoolean(aParts[3]),utils.parseBoolean(aParts[4]));
-                break;
-
-            case "key":
-                aParts.shift();
-                clientFrame = uint(aParts.shift());
-                Key(clientFrame,aParts);
-                // 1..length-1 array members are keypresses
-                break;
-                
-            default:
-                WSSendError( cc, "No such command.",1003);
-                return false;
-            }
-            return true;
-        }
-
-        /**
-         * Figure out how to adapt to client screen
-        **/
-        protected function CalcLayers( wide:int, high:int ) : void
-        {
-            clientWidth = wide;
-            clientHeight = high;
-
-            // Orient our game to the current window shape
-            clientAspect = wide/high;
-            var altScale : Number = 1;
-            if( wide < high )
-            {
-                if( wide <= ARENA_SIZE )
-                {
-                    clientScale = 1;
-                }
-                else
-                {
-                    clientScale = ARENA_SIZE/wide;
-                    // Snap scaling value near 1/int
-                    altScale = 1/Math.ceil(wide/ARENA_SIZE);
-                    if( Math.abs(clientScale-altScale) < 0.1 )
-                        clientScale = altScale;
-                }
-            }
-            else
-            {
-                if( high <= ARENA_SIZE )
-                {
-                    clientScale = 1;
-                }
-                else
-                {
-                    clientScale = ARENA_SIZE/high;
-                    // Snap scaling value near 1/int
-                    altScale = 1/Math.ceil(high/ARENA_SIZE);
-                    if( Math.abs(clientScale-altScale) < 0.1 )
-                        clientScale = altScale;
-                }
-            }
-            
-            clientPan.width = wide * clientScale;
-            clientPan.height = high * clientScale;
-            clientPan = utils.RectCenterIn(clientPan,pan);
-            utils.SnapRect(clientPan);
-
-            serverScale = vScale * clientScale;
-
-            // Calculate client sprite bitmap size
-            clientSprite = pan.clone();
-            clientSprite.width = Math.floor( clientSprite.width * serverScale );
-            clientSprite.height= Math.floor( clientSprite.height* serverScale );
-            
-            removeEventListener( Event.ENTER_FRAME, Heartbeat );
-            if( 0 >= clientSprite.width || 0 >= clientSprite.height )
-            {
-                if( null != bmCurr )
-                {
-                    bmCurr.dispose();
-                    bmCurr = null;
-                }
-                return;
-            }
-            addEventListener( Event.ENTER_FRAME, Heartbeat );
         }
 
         /**
@@ -368,70 +184,43 @@ package com.BugTest
             // This is just to refresh UI in Main.as... TODO: I need to work on this.
             Main.instance.dispatchEvent( new Event(Server.CONNECTED) );
 
+            airplane = applet.GetMovieClip("Airplane");
+            const airplanes : Array = utils.Shuffle( [1,2,3,4,5,6,7,8,9] );
+            var iAirplane : int = airplanes.shift();
+            airplanes.push(iAirplane);
+            airplane.gotoAndStop( iAirplane );
+            airplane.x = (Main.instance.GameWide * 0.25) + int(Main.instance.GameWide * 0.5 * Math.random());
+            airplane.y = (Main.instance.GameHigh * 0.25) + int(Main.instance.GameHigh * 0.5 * Math.random());
+            target_angle = airplane.rotation = 360 * Math.random();
+            utils.RectCenterPt( pan, airplane.x, airplane.y );
+            utils.SnapRect(pan);
+
+            // Figure out various parts
+            CalcLayers(clientWidth,clientHeight);
+            
+            // Send a complete background to the client
+            Main.instance.tilemap.Update( this, tiles, 1000 );
+            
+            // Wait for tiles to be processed on client
+            SendDerp( "HaveTiles" );
         }
         
-
-        /**
-         * Render+Send to client... if ready
-        **/
-        protected function Render() : BitmapData
+        
+        public function HaveTiles() : void
         {
-            utils.RectCenterIn( clientPan, pan );
-            utils.SnapRect(clientPan);
-            clientSprite = clientPan.clone();
-            serverScale = vScale * clientScale;
-            clientSprite.width = Math.floor( clientSprite.width * serverScale );
-            clientSprite.height= Math.floor( clientSprite.height* serverScale );
-
-            if( null == bmCurr || clientSprite.width != bmCurr.width || clientSprite.height != bmCurr.height )
-            {
-                if( null != bmCurr )
-                {
-                    bmCurr.dispose();
-                }
-                bmCurr = new BitmapData(clientSprite.width,clientSprite.height, true, 0);
-            }
-            else
-            {
-                bmCurr.fillRect(bmCurr.rect,0);
-            }
-            
-            // Update tiles behind sprites
-            tiles.position = clientPan;
-            Main.instance.tilemap.Update( this, tiles, serverFrame < 5 ? 1000 : 1 );
-
-            // Get client window position, centered in pan
-            if( null == bmClient || !bmClient.ready )
-            {
-                return null;
-            }
-            
-            // Generate sprite image
-            var mux : Matrix = new Matrix( serverScale,0,0,serverScale, -clientPan.x*serverScale, -clientPan.y*serverScale );
-            var mcPlay : MovieClip = Main.instance.mcPlay;
-            bmCurr.draw( mcPlay, mux );//, null, null, pan, true );
-
-            if( bmClient.RenderToDo( RenderHandler, bmCurr ) )
-            {
-                // Record where things were, when this image was made
-                var mcBugs : MovieClip = Main.instance.mcBugs;
-                clickMap.SnapshotChildren( ++serverFrame, clientPan, serverScale, mcBugs );
-            }
-
-            return bmCurr;
+trace("HaveTiles");
+            // Show game UI
+            smProgress.state = "Playing";
+            Playing();
+            Main.instance.mcPlay.addChild(airplane);
+            WSSendText("uion");
         }
-
+        
         /**
-         * Render+Send to client... if ready, and different
+         * This is where airplane refresh eventually needs to go
         **/
-        protected function Heartbeat(e:Event=null) : void
+        public function Playing() : void
         {
-            if( !bReady )
-            {
-                removeEventListener( Event.ENTER_FRAME, Heartbeat );
-                return;
-            }
-            
             // Turn airplane back towards play field, if it wanders off course
             if( airplane.x + ARENA_MID >= Main.instance.GameWide
              || airplane.x - ARENA_MID <= 0
@@ -472,6 +261,260 @@ package com.BugTest
                 Render();
             }
             // Long poll mode triggers render separately...
+        }
+        
+        private static var game_clients : Array = new Array();
+        public static function get LiveUsers() : int
+        {
+            return game_clients.length;
+        }
+
+        
+        /**
+         * We've fully received and decoded incoming data in 'Message'.  
+         * Do something with it.
+        **/
+        override public function WSReceivedTextMessage( cc : ClientConnection, str : String ) : Boolean
+        {
+            DoomsDayPostpone();
+            var aParts : Array = str.split(',');
+            //CONFIG::DEBUG { if( "frame" != aParts[0] ) trace("WSReceivedTextMessage:",str); }
+            var wide : int;
+            var high : int;
+            switch(aParts.shift())
+            {
+            case "frame":   // Just sending frame number to track lag
+                clientFrame = int(aParts[0]);
+                clientReceptionTime = Number(aParts[1]);
+                clientWidth = int(aParts[2]);
+                clientHeight= int(aParts[3]);
+                if( clientWidth <= 0 || clientHeight <= 0 || clientWidth > 8192 || clientHeight > 8192 )
+                {
+                    WSSendError( cc, "Bad Size:"+clientWidth+','+clientHeight,1003);
+                    return false;
+                }
+                var diff : int = serverFrame - clientFrame;
+                if( diff < 0 ) // (diff == 0) would be remarkable...
+                {
+                    WSSendError( cc, "Time Traveller Detected: "+serverFrame+"/"+clientFrame,1003);
+                    return false;
+                }
+                /*
+                Needs to be average fps
+                if( diff >= DROP_FRAME_THRESHOLD )
+                {   // If the client is falling behind, drop some resolution
+                    vScale *= 0.90;
+                    if( vScale < 0.5 )
+                        vScale = 0.5;
+                    CalcLayers(clientWidth,clientHeight);
+                }
+                else if( diff < ADD_FRAME_THRESHOLD )
+                {   // If the client is kicking butt, add some more resolution, but more slowly than we subtract
+                    vScale *= 1.05;
+                    if( vScale > 1 )
+                        vScale = 1;
+                    CalcLayers(clientWidth,clientHeight);
+                }
+                */
+                CalcLayers( clientWidth, clientHeight );
+                ccmain = cc;
+                break;
+
+            case "click":
+                Click(uint(aParts[0]),parseFloat(aParts[1]),parseFloat(aParts[2]),utils.parseBoolean(aParts[3]),utils.parseBoolean(aParts[4]));
+                break;
+
+            case "key":
+                aParts.shift();
+                clientFrame = uint(aParts.shift());
+                Key(clientFrame,aParts);
+                // 1..length-1 array members are keypresses
+                break;
+
+            case "ready":
+                smProgress.state = "HaveClient";
+                break;
+                
+            /**
+             * Handle depth guage repeat message, and verify authenticity
+            **/
+            case "derp":
+                var derpID : String = aParts.shift();
+                var derpKey: String = aParts.shift();
+                if( derpLut[derpID] == derpKey )
+                {
+                    ReceiveDerp(derpID);
+                    delete derpLut[derpID];
+                }
+                else
+                {
+                    WSSendError( cc, "Invalid key.",1003);
+                    return false;
+                }
+                break;
+                
+            default:
+                WSSendError( cc, "No such command.",1003);
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * Send depth repeater string
+         *
+         * This implements a simple callback mechanism to find out when a 
+         * previous batch of data sent to the client has actually arrived at, and
+         * been processed by the client.  So we need not begin refreshing sprites
+         * until an initial set of background tiles have been sent, or begin
+         * tracking input events on an interface before it has been displayed.
+         *
+         * We maintain a database of pending keys, and attach a unique and 
+         * unpredictable serial number to each of them.  They need to match, or 
+         * the server rejects it.  This should be relatively safe for client 
+         * and server.
+         *
+         * @param id App specific key to additional behavior
+        **/
+        protected function SendDerp( id : String ) : void
+        {
+            ++derpSeq;
+            var key : String = (derpSeq + Math.random()).toFixed(4);
+            derpLut[id] = key;
+            var msg : String = "derp,"+id+","+key;
+            WSSendText(msg);
+        }
+
+        /**
+         * When we get that string back, handle it.
+         * @param id App specific key to additional behavior
+        **/
+        protected function ReceiveDerp( id : String ) : void
+        {
+            // For simplicity, this sets our GameClient state.
+            //
+            // Caution: 
+            // This exposes some internal stuff to possible mischief, but since
+            // we check key and serial number for falsification, it's 'safe'
+            // enough for this example.  More sanity checking may or may not be
+            // needed.
+            smProgress.state = id;
+        }
+
+        /**
+         * Figure out how to adapt to client screen
+        **/
+        protected function CalcLayers( wide:int, high:int ) : void
+        {
+            // Orient our game to the current window shape
+            clientAspect = wide/high;
+            var altScale : Number = 1;
+            if( wide < high )
+            {
+                if( wide <= ARENA_SIZE )
+                {
+                    clientScale = 1;
+                }
+                else
+                {
+                    clientScale = ARENA_SIZE/wide;
+                    // Snap scaling value near 1/int
+                    altScale = 1/Math.ceil(wide/ARENA_SIZE);
+                    if( Math.abs(clientScale-altScale) < 0.1 )
+                        clientScale = altScale;
+                }
+            }
+            else
+            {
+                if( high <= ARENA_SIZE )
+                {
+                    clientScale = 1;
+                }
+                else
+                {
+                    clientScale = ARENA_SIZE/high;
+                    // Snap scaling value near 1/int
+                    altScale = 1/Math.ceil(high/ARENA_SIZE);
+                    if( Math.abs(clientScale-altScale) < 0.1 )
+                        clientScale = altScale;
+                }
+            }
+            utils.RectCenterIn( clientPan, pan );
+            utils.SnapRect(clientPan);
+            
+            clientPan.width = wide * clientScale;
+            clientPan.height = high * clientScale;
+            clientPan = utils.RectCenterIn(clientPan,pan);
+            utils.SnapRect(clientPan);
+            tiles.position = clientPan;
+
+            serverScale = vScale * clientScale;
+
+            // Calculate client sprite bitmap size
+            clientSprite = pan.clone();
+            clientSprite.width = Math.floor( clientSprite.width * serverScale );
+            clientSprite.height= Math.floor( clientSprite.height* serverScale );
+            
+            if( 0 >= clientSprite.width || 0 >= clientSprite.height )
+            {
+                if( null != bmCurr )
+                {
+                    bmCurr.dispose();
+                    bmCurr = null;
+                }
+                return;
+            }
+        }
+        
+
+        /**
+         * Render+Send to client... if ready
+        **/
+        protected function Render() : BitmapData
+        {
+            utils.RectCenterIn( clientPan, pan );
+            utils.SnapRect(clientPan);
+            clientSprite = clientPan.clone();
+            serverScale = vScale * clientScale;
+            clientSprite.width = Math.floor( clientSprite.width * serverScale );
+            clientSprite.height= Math.floor( clientSprite.height* serverScale );
+
+            if( null == bmCurr || clientSprite.width != bmCurr.width || clientSprite.height != bmCurr.height )
+            {
+                if( null != bmCurr )
+                {
+                    bmCurr.dispose();
+                }
+                bmCurr = new BitmapData(clientSprite.width,clientSprite.height, true, 0);
+            }
+            else
+            {
+                bmCurr.fillRect(bmCurr.rect,0);
+            }
+            
+            // Update tiles behind sprites
+            tiles.position = clientPan;
+            Main.instance.tilemap.Update( this, tiles, 1 );
+
+            // Get client window position, centered in pan
+            if( null == bmClient || !bmClient.ready )
+            {
+                return null;
+            }
+            
+            // Generate sprite image
+            var mux : Matrix = new Matrix( serverScale,0,0,serverScale, -clientPan.x*serverScale, -clientPan.y*serverScale );
+            var mcPlay : MovieClip = Main.instance.mcPlay;
+            bmCurr.draw( mcPlay, mux );//, null, null, pan, true );
+
+            if( bmClient.RenderToDo( RenderHandler, bmCurr ) )
+            {
+                // Record where things were, when this image was made
+                var mcBugs : MovieClip = Main.instance.mcBugs;
+                clickMap.SnapshotChildren( ++serverFrame, clientPan, serverScale, mcBugs );
+            }
+
+            return bmCurr;
         }
 
         /**
@@ -584,7 +627,8 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
         override public function Close(e:Event = null ) : void
         {
             Log("GameClient.Close");
-            removeEventListener( Event.ENTER_FRAME, Heartbeat );
+            
+            smProgress.state = FSM.IDLE;
             
             DoomsDayCancel();
             
@@ -600,11 +644,6 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
                 bmClient.Shutdown();
                 bmClient = null;
             }
-            if( null != bmUI )
-            {
-                bmUI.Shutdown();
-                bmUI = null;
-            }
             
 
             var i : int;
@@ -616,11 +655,6 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
             {
                 bmCurr.dispose();
                 bmCurr = null;
-            }
-            if( null != baPool )
-            {
-                baPool.Flush();
-                baPool = null;
             }
             super.Close(e);
             Main.instance.dispatchEvent( new Event(Server.DISCONNECTED) );
@@ -640,7 +674,7 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
         **/
         override public function HTTPAppMessage( cc : ClientConnection, address : String, header : String, ba : ByteArray, length : uint = 0 ) : Boolean
         {
-            //try
+            function TryFunc() : Boolean
             {
                 var aques  : Array = address.split('?');
                 if( 2 != aques.length )
@@ -663,22 +697,28 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
                     WSReceivedTextMessage( cc, param )
                 }
 
-                // Send accumulated xml to connection that requested this.
+                // Send accumulated data to connection that requested this.
                 WSEmulatorCommit(cc);
 
                 setTimeout(Render,1);
-
             }
-            function foo(e):void//catch(e)
+CONFIG::RELEASE {
+            // I want to catch errors, not crash, on release
+            try
+            {
+                return TryFunc();
+            }
+            catch(e)
             {
                 LogError(e);
                 cc.HTTPSendBorked("400 Error");
             }
-            //finally 
-            { 
-            }
-
-            return true;
+            return false;
+}
+CONFIG::DEBUG {
+            // I want crashes in place, in debug builds
+            return TryFunc();
+}
         }
         
     }

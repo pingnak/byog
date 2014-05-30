@@ -130,7 +130,7 @@ CONFIG::DEBUG {
 	        if( level > LOG_LEVEL )
 	            return;
 
-            var logMessage : String = utils.DoubleTime().toFixed(1) + ": ";
+            var logMessage : String = DoubleTime.Get().toFixed(1) + ": ";
             var i : int;
             var obj : Object;
             for( i = 0; i < args.length; ++i )

@@ -17,7 +17,7 @@
         <file path="client/">client.html</file>     <!-- Client page -->
         <file path="client/">404.html</file>        <!-- Not found page -->
         <file path="client/">404multi.html</file>   <!-- Trying to load multiple times -->
-        <file path="client/">favicon.png</file>     <!-- A page icon -->
+        <file path="client/">favicon.png</file>     <!-- A page/tab icon -->
         <file path="client/">favicon.ico</file>
         <file path="client/">crunch.mp3</file>      <!-- The crunch noise -->
         <file path="client/">silent.mp3</file>      <!-- A silent sample to play when first input happens -->
@@ -41,7 +41,7 @@
         <TILE_HIGH>50</TILE_HIGH>
 
         <!-- Each client gets a ARENA_SIZExARENA_SIZE space, and displays a window within it, according to its own shape -->
-        <ARENA_SIZE>384</ARENA_SIZE>
+        <ARENA_SIZE>360</ARENA_SIZE>
         
         <!-- Client sends requests, receives XML data back, which is basically the same content as the WebSocket data, wrapped in XML -->
         <LONG_POLL_XML>longpoll.txt</LONG_POLL_XML>
