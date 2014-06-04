@@ -304,8 +304,7 @@ function HandleWindowError(msg, url, line)
 function SendReady()
 {
     trace("SendReady()");
-    websock.send("ready");
-    depthGaugeID = setInterval(DepthGaugePing,%PING_FREQUENCY%);
+    WebSockSendStr("ready,"+currentFrame+","+Date.now()+','+window.innerWidth+','+window.innerHeight);
 }
 
 /** Tell server what frame it's displaying */
@@ -322,8 +321,9 @@ function HandleWebSockOpen( evt )
     WebSockSendStr = WebSockSend;
 
     // Send initial client size, then send ready message
-    DepthGaugePing();
-    setTimeout(SendReady,100);
+    SendReady();
+    depthGaugeID = setInterval(DepthGaugePing,%PING_FREQUENCY%);
+
 }
 
 /** Socket close event */
@@ -334,16 +334,28 @@ function HandleWebSockClose( evt )
 
 /** Wrap web socket send, to redirect to XMLHttpRequest url spew for older browsers*/
 var WebSockSendStr = WebSockSendDummy;
+/** Eat 'send' requests */
 function WebSockSendDummy( str ) {}
+/** Send to WebSocket */
 function WebSockSend( str ) 
 {
+    // We have some intermittent problems sending in response to receiving
     websock.send(str);
 }
+/** Emulate WebSocket.send as http url address spew */
 function WebSockSendXMLHttp( str )
 {
     xmlhttpUpload += '&'+str;
 }
-
+/** Send data, but delay so it falls out of scope - Chrome */
+function WebSockSendDelay(str,delay)
+{
+    setTimeout(SlightDelay,delay);
+    function SlightDelay() 
+    { 
+        WebSockSendStr(str); 
+    }
+}
 /** Handle what comes down from the server */
 function HandleWebSockMessage( evt ) 
 {
@@ -547,7 +559,7 @@ function Startup()
         LongPollAnswerHandler = HandleLongPollAnswer;
         xmlhttpUpload = "";
         LongPollRequest();
-        WebSockSendStr("ready");
+        SendReady();
     }
     else
     {   // Not much long ping potential
@@ -890,10 +902,12 @@ function HandleWebSockMessageTxt( str )
        by bots.
     */ 
     case "derp":
-        WebSockSendStr(str);
+        trace(str);
+        WebSockSendDelay(str,30);
         break;
 
     case "uion":
+        trace(str);
         EnableUI();
         break;
 
