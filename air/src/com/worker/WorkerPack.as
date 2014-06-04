@@ -8,7 +8,6 @@ package com.worker
     import flash.geom.*;
 
     import com.pingnak.ByteArrayPool;
-    import com.pingnak.debug;
     
     // Shared constants
     import com.pingnak.WorkerPackData;
@@ -84,7 +83,7 @@ package com.worker
         private function InitToDo(e:Event):void
         {
             var baReceive : ByteArray = initToDo.receive() as ByteArray;
-CONFIG::DEBUG { debug.Trace("*InitToDo:",baReceive.length); }
+CONFIG::DEBUG { trace("*InitToDo:",baReceive.length); }
 
             if( null != bmCurr )
             {
@@ -124,8 +123,7 @@ CONFIG::DEBUG { debug.Trace("*InitToDo:",baReceive.length); }
             */
 
             // Ultimately send data back in the buffer we were given
-debug.Trace(baReceive);
-CONFIG::DEBUG { debug.Trace("*InitDone:"); }
+CONFIG::DEBUG { trace("*InitDone:"); }
             baReceive.position = 0;
             initialized.send(baReceive);
             
@@ -137,7 +135,7 @@ CONFIG::DEBUG { debug.Trace("*InitDone:"); }
         **/
         private function DestructToDo(e:Event):void
         {
-CONFIG::DEBUG { debug.Trace("*DestructToDo!"); }
+CONFIG::DEBUG { trace("*DestructToDo!"); }
             destructToDo.receive();
 
             // Clean up our 'dead' message queues
@@ -167,14 +165,18 @@ CONFIG::DEBUG { debug.Trace("*DestructToDo!"); }
             
             baPoolPack.Flush();
             baPoolPack = null;
-CONFIG::DEBUG { debug.Trace("*Doom!"); }
+CONFIG::DEBUG { trace("*Doom!"); }
             
             // Send a nothing message to let us know we're gone
             destroyed.send(null);
 
+            // Prompt garbage collection on all of these bitmaps and buffers
+            // BitmapClient.as does it too, but that's on a different copy of the interpreter
+            System.pauseForGCIfCollectionImminent();
+            
             // Should never return...
             Worker.current.terminate();
-CONFIG::DEBUG { debug.Trace("*Doomy-doom!"); }// If you see this, something's horribly wrong....
+CONFIG::DEBUG { trace("*Doomy-doom!"); }// If you see this, something's horribly wrong....
         }
 
         /**
@@ -185,7 +187,7 @@ CONFIG::DEBUG { debug.Trace("*Doomy-doom!"); }// If you see this, something's ho
         private function FrameToDo(e:Event):void
         {
             var baReceive : ByteArray = frameToDo.receive() as ByteArray;
-//CONFIG::DEBUG { debug.Trace("*FrameToDo:",baReceive.length); }
+//CONFIG::DEBUG { trace("*FrameToDo:",baReceive.length); }
             var baRespond : ByteArray = null;
             var bytes : ByteArray = null;
             var diff : BitmapData = null;
@@ -234,7 +236,7 @@ CONFIG::DEBUG { debug.Trace("*Doomy-doom!"); }// If you see this, something's ho
                         baRespond.writeInt(0);
                         baRespond.writeInt(0);
                         baRespond.writeInt(0);
-CONFIG::DEBUG {         debug.Trace("*Null diff"); }
+CONFIG::DEBUG {         trace("*Null diff"); }
                     }
                     else
                     {
@@ -288,7 +290,7 @@ CONFIG::DEBUG {         debug.Trace("*Null diff"); }
                             baRespond.writeInt(0);
                             baRespond.writeInt(0);
                             baRespond.writeInt(0);
-//CONFIG::DEBUG {             debug.Trace("*Empty", bmCurr.rect, dBounds, dBoundsIn); }
+//CONFIG::DEBUG {             trace("*Empty", bmCurr.rect, dBounds, dBoundsIn); }
                         }
 
                     }
@@ -340,7 +342,7 @@ CONFIG::DEBUG {         debug.Trace("*Null diff"); }
                         baRespond.writeInt(0);
                         baRespond.writeInt(0);
                         baRespond.writeInt(0);
-//CONFIG::DEBUG {         debug.Trace("*Empty2", bmCurr.rect, dBounds, dBoundsIn); }
+//CONFIG::DEBUG {         trace("*Empty2", bmCurr.rect, dBounds, dBoundsIn); }
                     }
 
                     // Ultimately send data back in the buffer we were given
@@ -352,7 +354,7 @@ CONFIG::DEBUG {         debug.Trace("*Null diff"); }
                     }
                 }
             }
-            catch(e:Error) { debug.TraceError(e); }
+            catch(e:Error) { trace("FrameToDo Error:",e.toString()); }
             finally
             {
                 // Whatever happens, don't leak this stuff.  It gets expensive, real fast.
@@ -377,7 +379,6 @@ CONFIG::DEBUG {         debug.Trace("*Null diff"); }
         **/
         public static function BytesToBase64( baDst:ByteArray, baSrc:ByteArray ) : void
         {
-CONFIG::DEBUG { debug.Assert( 0 != baSrc.length ); }
             //const encodes : String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             const encodes : Vector.<int> = new <int>[
                 65,66,67,68,69,70,71,72,73,74,  // A-Z

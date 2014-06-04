@@ -41,7 +41,7 @@
         <TILE_HIGH>50</TILE_HIGH>
 
         <!-- Each client gets a ARENA_SIZExARENA_SIZE space, and displays a window within it, according to its own shape -->
-        <ARENA_SIZE>360</ARENA_SIZE>
+        <ARENA_SIZE>640</ARENA_SIZE>
         
         <!-- Client sends requests, receives XML data back, which is basically the same content as the WebSocket data, wrapped in XML -->
         <LONG_POLL_XML>longpoll.txt</LONG_POLL_XML>

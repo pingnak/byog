@@ -143,63 +143,51 @@ CONFIG::DEBUG { debug.Trace("InitializedWorker"); }
         **/
         public function RenderToDo( cbDone : Function, bm:BitmapData, rect : Rectangle = null ):Boolean
         {
-            if( !bWorkerInitialized )
+            if( !ready )
+                return false;
+            if( null != rect )
             {
-                debug.TraceError( "Dead Worker" );
+                // We should have bounds inside what can be rendered
+CONFIG::DEBUG { debug.Assert( bm.rect.intersects(rect), rect, bm.rect ); }
+                rect = rect.intersection(bm.rect);
+            }
+            else
+            {
+                rect = bm.rect;
+            }
+            if( 0 == rect.width )
+            {
                 return false;
             }
-            
-            if( !frameToDo.messageAvailable )
+            try
             {
-                if( null != rect )
-                {
-                    // We should have bounds inside what can be rendered
-CONFIG::DEBUG {     debug.Assert( bm.rect.intersects(rect), rect, bm.rect ); }
-                    rect = rect.intersection(bm.rect);
-                }
-                else
-                {
-                    rect = bm.rect;
-                }
-                if( 0 == rect.width )
-                {
-CONFIG::DEBUG {     debug.Trace("Empty",rect); }
-                    return false;
-                }
-                try
-                {
-                    // Add it to task queue
-                    var baEncode : ByteArray = baPoolShared.New();
-                    ++idCurr;
-                    queue[idCurr] = { cb:cbDone, ba:baEncode };
-                    baEncode.writeInt(idCurr);
-                    baEncode.writeInt(rect.left);
-                    baEncode.writeInt(rect.top);
-                    baEncode.writeInt(rect.width);
-                    baEncode.writeInt(rect.height);
-                    bm.copyPixelsToByteArray(rect, baEncode);
-                    baEncode.length = baEncode.position;
-                    baEncode.position = 0;
-                    frameToDo.send(baEncode);
-                }
-                catch(e:Error) 
-                { 
-                    if( null != baEncode )
-                    {
-                        baPoolShared.Delete(baEncode);
-                        delete queue[idCurr];
-                        baEncode = null;
-                    }
-                    debug.TraceError(e); 
-                    return false;
-                }
-                finally
-                {
-                    // Add it to task queue
-                    baEncode = null;
-                }
+                // Add it to task queue
+                var baEncode : ByteArray = baPoolShared.New();
+                ++idCurr;
+                queue[idCurr] = { cb:cbDone, ba:baEncode };
+                baEncode.writeInt(idCurr);
+                baEncode.writeInt(rect.left);
+                baEncode.writeInt(rect.top);
+                baEncode.writeInt(rect.width);
+                baEncode.writeInt(rect.height);
+                bm.copyPixelsToByteArray(rect, baEncode);
+                baEncode.length = baEncode.position;
+                baEncode.position = 0;
+                frameToDo.send(baEncode);
+                baEncode = null;
                 return true;
             }
+            catch(e:Error) 
+            { 
+                if( null != baEncode )
+                {
+                    baPoolShared.Delete(baEncode);
+                    delete queue[idCurr];
+                }
+                debug.TraceError(e); 
+            }
+            // Add it to task queue
+            baEncode = null;
             return false;
         }
 
@@ -294,6 +282,7 @@ CONFIG::DEBUG {     debug.Trace("Empty",rect); }
             baPoolShared.Flush();
             baPoolShared = null;
 
+            // Prompt garbage collection on all of these bitmaps and buffers
             System.pauseForGCIfCollectionImminent();
        }
                 

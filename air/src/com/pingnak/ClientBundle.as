@@ -405,7 +405,7 @@ CONFIG::DEBUG { debug.ThrowAssert("Binary long poll mode disabled..."); }
         }
 
         /**
-         * Send a brief closing message to client
+         * Send a brief closing message to client, and terminate connection
          * @param str String to send along with it
         **/
         public function WSSendError( cc:ClientConnection, str:String,code:int=1000):void
