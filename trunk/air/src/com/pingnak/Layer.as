@@ -4,7 +4,7 @@ package com.pingnak
     import flash.display.*;
     import flash.geom.*;
     import flash.utils.*;
-
+    
     /**
      * Class to encapsulate a rendering layer
      * 
@@ -31,33 +31,26 @@ package com.pingnak
         /** Current image */
         protected var bmCurr : BitmapData;
         
-        /** What to draw into the bitmap */
-        protected var dobj : DisplayObject;
-        protected var dobjInteractive : DisplayObjectContainer;
-        
         /** Map of frames we've generated, and sent down to client, with 'old' positions of things */
         protected var clickMap : ClickMap;
 
         /** Unique server frames (months' worth) */
         protected var frameNumber : uint;
         
+        /** Get last rendered frame number */
         public function get frame() : uint { return frameNumber; }
         
         /**
          * @param id ID given to client for image layer
          * @param cb Details about how to talk to client
-         * @param dobj What to draw
-         * @param dobjInteractive If different from dobj, DisplayObject to check for clicks in  
+         * @param mode Optionally override image packaging mode
         **/
-        public function Layer( id : String, cb : ClientBundle, dobj : DisplayObject, dobjInteractive : DisplayObjectContainer = null )
+        public function Layer( id : String, cb : ClientBundle, mode : uint = WorkerPackData.bPNG | WorkerPackData.bTransparent | WorkerPackData.bMinimum | WorkerPackData.bBase64 )
         {
             this.id = id;
             this.cb = cb;
-            this.dobj = dobj;
-            this.dobjInteractive = null == dobjInteractive ? dobj as DisplayObjectContainer : dobjInteractive;
-// We really do want an interactive DisplayObjectContainer
-CONFIG::DEBUG { debug.Assert( null != this.dobjInteractive ); }
-            InitWorker( WorkerReady, WorkerPackData.bPNG | WorkerPackData.bTransparent | WorkerPackData.bMinimum | WorkerPackData.bBase64, 1 );
+
+            InitWorker( WorkerReady, mode, 1 );
             
             // Map of where things were, when last updata happened, at scale of client
             clickMap = new ClickMap();
@@ -66,18 +59,31 @@ CONFIG::DEBUG { debug.Assert( null != this.dobjInteractive ); }
         }
 
         /**
+         * Worker process is initialized
+        **/
+        protected function WorkerReady() : void
+        {
+            dispatchEvent( new Event( INITIALIZED ) );
+        }
+
+        /**
          * Render centered on wcX,wcY
+         * @param serverFrame A number to identify this frame with, for client/click reference
+         * @param dobj What to draw
+         * @param dobjInteractive If different from dobj, DisplayObjectContainer to check for clicks in
          * @param wcPan Where to render, within dobj.getBounds(stage), or null == use its own bounding box
          * @param clientScale How to scale the pan window, for the client
          * @return false if render pipeline is backlogged (still busy with previous)
         **/
-        public function Render( wcPan : Rectangle = null, clientScale : Number = 1 ) : Boolean
+        public function Render( serverFrame : uint, dobj : DisplayObject, dobjInteractive : DisplayObjectContainer = null, wcPan : Rectangle = null, clientScale : Number = 1 ) : Boolean
         {
             // Get client window position, centered in pan
             if( !ready )
             {
                 return false;
             }
+            
+            frameNumber = serverFrame;
             
             // Make sure pan rect is on pixel bounds
             if( null == wcPan )
@@ -106,21 +112,15 @@ CONFIG::DEBUG { debug.Assert( null != this.dobjInteractive ); }
                 bmCurr.fillRect(bmCurr.rect,0);
             }
 
-            // Generate sprite image
+            // Draw image to bitmap
             var mux : Matrix = new Matrix( clientScale,0,0,clientScale, -ccPan.x, -ccPan.y );
             bmCurr.draw( dobj, mux );//, null, null, pan, true );
-            RenderToDo( RenderHandler, bmCurr );
             
             // Record where things were, when this image was made
-            clickMap.SnapshotChildren( ++frameNumber, wcPan, clientScale, dobjInteractive );
+            clickMap.SnapshotChildren( frameNumber, wcPan, clientScale, null == dobjInteractive ? dobj as DisplayObjectContainer : dobjInteractive );
 
-            return true;
-        }
-
-
-        protected function WorkerReady() : void
-        {
-            dispatchEvent( new Event( INITIALIZED ) );
+            // Send bitmap off to be packed
+            return RenderToDo( RenderHandler, bmCurr );
         }
 
         /**

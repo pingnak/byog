@@ -79,14 +79,17 @@ package com.pingnak
          * @return false if out of bounds
         **/
         public function FixClick( frame : int, ptio : Point ) : Boolean
-        {
+        {   
+            // If less recently refreshed than connection frame, latest snapshot
+            frame = Math.min(frame,max);    
             var cframe : ClickMapFrame = aFrames[frame];
             if( null != cframe )
             {
-                return cframe.ClickedOn(ptio);
+                return cframe.FixClick(ptio);
             }
-            return null;
-        }            
+            return false;
+        }
+
         /**
          * Test if something is clicked.  Return it, if so.
          * @param frame Frame number when click happened
@@ -94,7 +97,9 @@ package com.pingnak
          * @return DisplayObject from list, if click landed in a bounding box
         **/
         public function ClickedOn( frame : int, ptio : Point ) : DisplayObject
-        {
+        {   
+            // If less recently refreshed than connection frame, latest snapshot
+            frame = Math.min(frame,max);
             var cframe : ClickMapFrame = aFrames[frame];
             if( null != cframe )
             {
