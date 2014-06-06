@@ -4,10 +4,57 @@ package com.pingnak
     import flash.display.*;
     import flash.utils.*;
 
+/*    
+    TO DO:
+    
+    Implement on top of Layer class, using notes from this prototype.
+    
+    Build plane picking test case, and other nik-naks.
+    
+    Fixup client so layers are less 'complicated'?
+    
+    Probably implement to work without subclassing UILayer, since this is 
+    sort of a heavy-weight class.  Do most of the mundane work here, and 
+    generate/synthesize events to drive state, per user.
+
+    Work out partial div layer coverage, for huds and other such things, to 
+    reduce some of the work the client does (theoretically, anyways)
+    
+    Unlike sprite layer, this should be 1:1 resolution (up to a limit - no 
+    need to screw with 'retina' resolutions) and infrequently refreshed.  
+    
+    Do 'diff' packing, since most UIs are solid and only have some parts 
+    refreshed.  This will exercise code in Worker/BitmapClient that is untested,
+    so bugs are likely to turn up.
+
+    More competent mouse/touch/keyboard tracking.
+    
+    Add show/hide client triggers to Layer class.
+
+    I'm probably not going to make a 'generic' client handling mode; the client
+    we serve should know about how the server works, and vice-versa, so no need
+    for databases and tables on client side, to handle cases that we don't use.
+    
+    Fix long poll client capabilities!  It's broken, for now, until I finish
+    tinkering with render handlers.  Think about how to make it less bothersome,
+    even though this will probably be the last major refactoring of render layers
+    that keep breaking it.
+    
+    Trigger Zoopy/Fadey effects on client side?  This sort of animation would be
+    simpler+smoother if triggered from server, and acted out by client.  Most 
+    likely a 'snapshot' layer to get dead/previous UI, and 'new one' (or none),
+    and apply some quick, stock scale+alpha effects to it.
+        PopIn: Pop up UI instantly
+        FadeIn: Fade up, on top of game
+        CrossFade: Exchange UIs (new shown, 'old' fades out - only suitable for 'full screen' UI)
+        FadeOut: Remove UI with fancy fade
+        PopOut: Remove UI instantly
+        
+*/    
     /**
      * Class to encapsulate user interface elements between server and client
     **/
-    public class UILayer extends Sprite
+    public class UILayer extends Layer
     {
         /*
          * Where to align interface
@@ -47,25 +94,14 @@ package com.pingnak
         /** Pinned to bottom+right corner */
         public static const BOTTOMRIGHT : String = "BOTTOMRIGHT";
         
-        /** Higher definition UI layer */
-        protected var bmUI : BitmapClient;
-
-        /** State to manage this */
-        public var smOperation : FSMDObj;
-
-        /** Current UI */
-        protected var uiCurr : MovieClip;
         
         /** Alignment for UI */
         protected var alignment : String;
         
-        /** Client data to send back to */
-        protected var cb : ClientBundle;
-        protected var clientWide : uint;
-        protected var clientHigh : uint;
         
-        public function UILayer( cb : ClientBundle )
+        public function UILayer( id : String, cb : ClientBundle )
         {
+            super( id, cb, WorkerPackData.bPNG | WorkerPackData.bTransparent | WorkerPackData.bDelta | WorkerPackData.bMinimum | WorkerPackData.bBase64 )
             this.cb = cb;
             smOperation = new FSMDObj(this);
         }

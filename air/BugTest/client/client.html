@@ -347,7 +347,7 @@ function WebSockSendXMLHttp( str )
 {
     xmlhttpUpload += '&'+str;
 }
-/** Send data, but delay so it falls out of scope - Chrome */
+/** Send data, but delay so it falls out of scope */
 function WebSockSendDelay(str,delay)
 {
     setTimeout(SlightDelay,delay);
@@ -897,13 +897,13 @@ function HandleWebSockMessageTxt( str )
        This is a generic depth guage.  Just return the packet.
        This allows us to measure when contents have been received by client, so 
        we can trigger state on the server knowing that something like the tiles,
-       or a UI page has fully been downloaded.  This should probably include a 
-       random number so that the answer isn't 'faked', to trigger bugs, or used
-       by bots.
+       or a UI page has fully been downloaded.  This includes a random number so 
+       that the answer isn't 'faked', to trigger bugs.
     */ 
     case "derp":
         trace(str);
-        WebSockSendDelay(str,30);
+        WebSockSendStr(str);
+        //WebSockSendDelay(str,100);
         break;
 
     case "uion":

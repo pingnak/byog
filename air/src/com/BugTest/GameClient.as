@@ -177,7 +177,7 @@ package com.BugTest
                 InitializedWorker();
                 return;
             }
-            sprite = new Layer( "sprite", this, Main.instance.mcPlay, Main.instance.mcBugs );
+            sprite = new Layer( "sprite", this );
             sprite.addEventListener( Layer.INITIALIZED, InitializedWorker );
             /*
             if( null == bmClient )
@@ -327,28 +327,17 @@ package com.BugTest
                     WSSendError( cc, "Bad Size:"+clientWidth+','+clientHeight,1003);
                     return false;
                 }
-                /*
-                var diff : int = sprite.frame - clientFrame;
-                if( diff < 0 ) // (diff == 0) would be remarkable...
+                if( null != sprite )
                 {
-                    WSSendError( cc, "Time Traveller Detected: "+serverFrame+"/"+clientFrame,1003);
-                    return false;
+                    var diff : int = sprite.frame - clientFrame;
+                    if( diff < 0 ) // (diff == 0) would be remarkable...
+                    {
+                        WSSendError( cc, "Time Traveller Detected: "+serverFrame+"/"+clientFrame,1003);
+                        return false;
+                    }
                 }
-                Needs to be average fps
-                if( diff >= DROP_FRAME_THRESHOLD )
-                {   // If the client is falling behind, drop some resolution
-                    vScale *= 0.90;
-                    if( vScale < 0.5 )
-                        vScale = 0.5;
-                    CalcLayers(clientWidth,clientHeight);
-                }
-                else if( diff < ADD_FRAME_THRESHOLD )
-                {   // If the client is kicking butt, add some more resolution, but more slowly than we subtract
-                    vScale *= 1.05;
-                    if( vScale > 1 )
-                        vScale = 1;
-                    CalcLayers(clientWidth,clientHeight);
-                }
+                /*
+                    Do something about client falling behind...
                 */
                 CalcLayers( clientWidth, clientHeight );
                 ccmain = cc;
@@ -371,7 +360,7 @@ package com.BugTest
             case "derp":
                 CONFIG::DEBUG { trace(str); }
                 var derpKey: String = aParts.shift();
-                var derpID : String = derpLut[derpKey] as String;
+                var derpID : Object = derpLut[derpKey];
                 if( null != derpID )
                 {
                     ReceiveDerp(derpID);
@@ -405,14 +394,14 @@ package com.BugTest
          * the server rejects it.  This should be relatively safe for client 
          * and server.
          *
-         * @param id App specific key to additional behavior (secret from client)
+         * @param obj Something for app to act on, after client sends key back
         **/
-        protected function SendDerp( id : String ) : void
+        protected function SendDerp( obj : Object ) : void
         {
-            // 1.[random], 2.[random], 3.[random], ...
             ++derpSeq;
+            // 1.[random], 2.[random], 3.[random], ...
             var key : String = (derpSeq + Math.random()).toFixed(4);
-            derpLut[key] = id;
+            derpLut[key] = obj;
             var msg : String = "derp,"+key;
             WSSendText(msg);
         }
@@ -421,13 +410,13 @@ package com.BugTest
          * When we get that string back, handle it.
          * @param id App specific key to additional behavior
         **/
-        protected function ReceiveDerp( id : String ) : void
+        protected function ReceiveDerp( obj : Object ) : void
         {
             //
             // We expose nothing but a uniquely generated sequential+random 
             // identifier to look up the key.  In this case, state machine state.
             //
-            fsm.state = id;
+            fsm.state = obj as String;
         }
 
         /**
@@ -483,7 +472,6 @@ package com.BugTest
             clientSprite = pan.clone();
             clientSprite.width = Math.floor( clientSprite.width * serverScale );
             clientSprite.height= Math.floor( clientSprite.height* serverScale );
-            
         }
         
 
@@ -492,6 +480,9 @@ package com.BugTest
         **/
         protected function Render() : Boolean
         {
+            // Keep generating unique frame identifiers
+            ++serverFrame;
+
             // Work out where to render, now
             utils.RectCenterIn( clientPan, pan );
             utils.SnapRect(clientPan);
@@ -505,7 +496,7 @@ package com.BugTest
             Main.instance.tilemap.Update( this, tiles, 1 );
             
             // Render next frame of sprite activity
-            return sprite.Render( clientPan, serverScale );
+            return sprite.Render( serverFrame, Main.instance.mcPlay, Main.instance.mcBugs, clientPan, serverScale );
         }
 
         /**
