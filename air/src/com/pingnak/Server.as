@@ -174,7 +174,7 @@ package com.pingnak
         /**
          * Get a list of available IP addresses
         **/
-        public static function GetInterfaces(ipV6 : Boolean = false) : Array
+        public static function GetInterfaces(ipV6 : Boolean = true) : Array
         {
             var networkInfo : NetworkInfo = NetworkInfo.networkInfo;
             var interfaces : Vector.<NetworkInterface> = networkInfo.findInterfaces();
@@ -191,10 +191,12 @@ package com.pingnak
                 for ( j = 0; j < interfaceObj.addresses.length; j++ )
                 {
                     address = interfaceObj.addresses[j];
+                    //trace(address.ipVersion, address.address );
+
                     // Exculde loopback, and ipV6 addresses, unless asked for
                     if( address.address != "127.0.0.1" && 
                         ((ipV6 && address.address != "::1") || -1 == address.address.indexOf(":")) )
-                        result.push(address.address);
+                        result.push(address);
                 }
             }
             return result;

@@ -103,7 +103,7 @@ package com.BugTest
         private var MS_REASONABLE_INVISIBILITY : uint = 30000;
 
         /** User interface rendering layer (higher def than sprite) */
-        public var ui    : Layer;
+        public var ui    : UILayer;
 
         /** Sprite rendering layer */
         public var sprite: Layer;
@@ -179,6 +179,9 @@ package com.BugTest
             }
             sprite = new Layer( "sprite", this );
             sprite.addEventListener( Layer.INITIALIZED, InitializedWorker );
+
+            ui = new UILayer( "ui", this );
+            ui.addEventListener( Layer.INITIALIZED, InitialiedUI );
             /*
             if( null == bmClient )
             {
@@ -188,6 +191,13 @@ package com.BugTest
             */
         }
 
+        /**
+         * Callback when UI worker finished initializing
+        **/
+        protected function InitialiedUI(e:Event=null):void
+        {
+        }
+        
         /**
          * Callback when worker finished initializing
         **/
@@ -659,7 +669,10 @@ CONFIG::DEBUG { Log("DoomsDayHandler!"); }
                 // Send accumulated data to connection that requested this.
                 WSEmulatorCommit(cc);
 
-                setTimeout(Render,1);
+                if( null != sprite && sprite.ready )
+                    setTimeout(Render,1);
+                    
+                return true;
             }
 CONFIG::RELEASE {
             // I want to catch errors, not crash, on release

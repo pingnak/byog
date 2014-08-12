@@ -400,7 +400,7 @@ package com.pingnak
          * This finds everything in order, from lowest depth, to topmost.
          *
          * @param dobj Start of DisplayObject tree search 
-         * @param callback Function() : Boolean - return true to stop at current display object
+         * @param callback Function(DisplayObject) : Boolean - return true to stop at current display object
          * @return DisplayObject that callback stopped at, or null if we recursed all and didn't find it
         **/
         public static function DObjBreadthFirst( dobj : DisplayObject, callback : Function ) : DisplayObject
@@ -432,7 +432,7 @@ CONFIG::DEBUG { debug.Assert( null != callback ); }
         /**
          * Perform a recursive, depth-first callback of display objects
          * @param dobj Start of DisplayObject tree search 
-         * @param callback Function() : Boolean - return true to stop at current display object
+         * @param callback Function(DisplayObject) : Boolean - return true to stop at current display object
          * @return DisplayObject that callback stopped at, or null if we recursed all and didn't find it
         **/
         public static function DObjDepthFirst( dobj : DisplayObject, callback : Function ) : DisplayObject
@@ -480,13 +480,13 @@ CONFIG::DEBUG { debug.Assert( null != callback ); }
          * Find a DisplayObject by hinted '.' path
          *
          * Basically, if we re-arrange the contents of a MovieClip, this will 
-         * tend to find children of children without worrying overmuch about the 
-         * absolute path to them, or naming every step to find them, such as 
-         * reuse cases for a MovieClip.
+         * find children of children without worrying overmuch about the absolute 
+         * path to them, or naming every step to find them, such as reuse cases 
+         * for a MovieClip.
          *
          * In the case where we have mc.balloon.moo.face.(unnamed).skeleton.hotpt...
          *      DObjFind(mc,"moo") would find 'moo'
-         *      DObjFind(mc,"moo.hotpt") would find 'moo', then find 'hotpt' in moo.
+         *      DObjFind(mc,"moo.hotpt") would find 'moo', then find 'hotpt' in moo, whatever the depth to it.
          *
          * We do this because more than one thing might have 'hotpt' in it, so we
          * need to be somewhat specific for those cases.
@@ -502,11 +502,11 @@ CONFIG::DEBUG { debug.Assert( null != callback ); }
             while( asplit.length )
             {
                 labelcurr = asplit.shift();
-                dobj = DObjBreadthFirst( dobj, foundIt );
+                dobj = DObjBreadthFirst( dobj, findIt );
                 if( null == dobj )
                     return null;
             }
-            function foundIt(dobjCurr:DisplayObject) : Boolean
+            function findIt(dobjCurr:DisplayObject) : Boolean
             {
                 return dobjCurr.name == labelcurr;
             }
@@ -526,6 +526,8 @@ CONFIG::DEBUG { debug.Assert( null != callback ); }
 CONFIG::DEBUG { debug.Assert( null != ret ); }
             return ret;
         }
+        
+
     }
 }
    

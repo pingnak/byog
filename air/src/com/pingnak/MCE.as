@@ -155,12 +155,12 @@ CONFIG::DIKEIN
         **/
         public static function Disable( mc : MovieClip ) : MovieClip
         {
+            mc.stop();
             var frame : int;
             for( frame = 0; frame < mc.totalFrames; ++frame )
             {
                 mc.addFrameScript( frame, null );
             }
-            mc.stop();
             return mc;
         }
 }
@@ -255,15 +255,15 @@ CONFIG::DIKEOUT
         **/
         public static function Disable( mc : MovieClip ) : MovieClip
         {
+            mc.stop();
             mc.removeEventListener( Event.ENTER_FRAME, mcPermanentCallback );
             delete triggerLUT[mc];
-            mc.stop();
             return mc;
         }
 }
 
         /**
-         * Play a clip, then stop it
+         * Callback to stop a played clip
         **/
         public static function StopIt(e:Event):void
         {
@@ -306,6 +306,109 @@ CONFIG::DIKEOUT
             mc.addEventListener( MCE.LABEL_LAST, LoopIt );
         }
 
+        /**
+         * Check if a MovieClip has a label.
+         * @param mc to test
+         * @param label Label of frame to test
+        **/
+        public static function HasLabel( mc : MovieClip, label : * ) : Boolean 
+        {
+CONFIG::DEBUG { debug.Assert( label is Number || label is String ); }
+            if( null == mc )
+            {   // Null, or not movieclip
+                return false;
+            }
+            if( label is Number )
+            {   // Frame is in range
+                return int(label) >= 1 && int(label) <= mc.totalFrames;
+            }
+            var obj : FrameLabel;
+            for each( obj in mc.currentLabels )
+            {
+                if( obj.name == label )
+                    return true;
+            }
+            return false;
+        }
+        
+        /**
+         * Find out how many frames are in a labeled set of frames
+         * @param mc to test
+         * @param label Label of frame series to test
+         * @return Count of frames, or 0 if label doesn't exist
+        **/
+        public static function NumFrames( mc : MovieClip, label : String ) : int 
+        {
+            if( null == mc )
+            {   // Null, or not movieclip
+                return 0;
+            }
+            var obj : FrameLabel;
+            var i : int;
+            for( i = 0; i < mc.currentLabels.length; ++i )
+            {
+                obj = mc.currentLabels[i];
+                if( obj.name == label )
+                {
+                    if( i < mc.currentLabels.length - 1 )
+                    {   // From label, to next label
+                        return mc.currentLabels[i+1].frame - obj.frame;
+                    }
+                    else
+                    {   // From label, to end
+                        return 1 + mc.totalFrames - obj.frame;
+                    }
+                }
+            }
+            return 0;
+        }
+
+
+        /**
+         * Find MovieClips in a DisplayObject, and stop them all, and do some rudimentary cleanups.
+         * A MovieClip in flash is very wasteful.  Every little MovieClip within
+         * a MovieClip is initially playing when it is created.  It's a lot of 
+         * housekeeping.  This will clean up
+         * @param dobj DisplayObject that may contain MovieClips, to stop
+        **/
+        public static function StopTree( dobj : DisplayObject ) : void
+        {
+            utils.DObjBreadthFirst( dobj, Stop );
+            function Stop(dobj:DisplayObject):DisplayObject
+            {
+                if( dobj is MovieClip )
+                {
+                    MCE.Disable(dobj as MovieClip)
+                    MCM.Stop(dobj as MovieClip);
+                }
+            }
+        }
+
+        /**
+         * Find MovieClips in a DisplayObject, and play them all.
+         * @param dobj DisplayObject that may contain MovieClips, to play
+         * @param startFrame Optional start frame/label to play from
+        **/
+        public static function PlayTree( dobj : DisplayObject, startFrame : *= 1 ) : void
+        {
+            utils.DObjBreadthFirst( dobj, Start );
+            function Start(dobj:DisplayObject):DisplayObject
+            {
+                if( dobj is MovieClip )
+                {
+CONFIG::DEBUG {     // In debug mode, seeking a movieclip to undefined frame throws an exception                   
+                    if( MCE.HasLabel(dobj as MovieClip,startFrame) )
+                        (dobj as MovieClip).gotoAndPlay(startFrame);
+                    else
+                        (dobj as MovieClip).gotoAndPlay(1);
+}
+CONFIG::RELEASE {   // In release mode, the above test is done for us
+                    (dobj as MovieClip).gotoAndPlay(startFrame);
+}
+
+                }
+            }
+        }
     }
 }
 
