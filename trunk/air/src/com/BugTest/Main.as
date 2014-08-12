@@ -15,8 +15,13 @@ package com.BugTest
     import flash.desktop.SystemIdleMode;
     import flash.filesystem.*;
 
+    // QR Code library
+    import org.qrcode.QRCode;
+    
     import com.pingnak.*;
     
+    
+
     /**
      * This server isn't meant to play for a cast of thousands. 
      *
@@ -87,6 +92,7 @@ package com.BugTest
 
         // Current UI
         public var ui : MovieClip;
+        public var mcQR : MovieClip;
         public var mcMask : MovieClip;
         public var mcPlay : MovieClip;
         public var  mcBugs : MovieClip;
@@ -160,7 +166,7 @@ package com.BugTest
             //stage.quality = StageQuality.LOW;
             // Won't get any.
             // http://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/flash/display/Stage.html#quality
-            
+            mcQR   = ui.mcQR;
             mcMask = ui.mcGameUI.mcMask;
             mcPlay = ui.mcGameUI.mcPlay;
             mcBugs = mcPlay.mcBugs;
@@ -206,16 +212,43 @@ package com.BugTest
         **/
         private function UpdateIPList(e:Event=null):void
         {
+            var qr:QRCode = new QRCode();
+            while( 0 != mcQR.numChildren )
+                mcQR.removeChildAt(0);
+
             var aip : Array = Server.GetInterfaces();
             var tf : String = "";
-            var curr : String;
+            var httpCurr : String;
+            var curr : InterfaceAddress;
             var port : int = uint(ui.tfPort.text);
+            var bmQR : Bitmap;
+            var qrCurr : MovieClip;
             while( 0 < aip.length )
             {
                 curr = aip.shift();
-                tf += "http://"+curr+":"+port+(0<aip.length?", ":"");
+                switch( curr.ipVersion )
+                {
+                    case 'IPv4':
+                        httpCurr = "http://"+curr.address+":"+port.toString();
+                        break;
+                    default:
+                    case 'IPv6':
+                        httpCurr = "http://["+curr.address+"]:"+port.toString();
+                        break;
+                }
+                tf + httpCurr + (0<aip.length?", ":"")
+                
+                const QR_SEP : int = 32;
+                qr.encode(httpCurr);
+                bmQR = new Bitmap(qr.bitmapData);
+                qrCurr = new QRInfo();
+                qrCurr.y = mcQR.height + (0==mcQR.height?0:QR_SEP);
+                mcQR.addChild(qrCurr);
+                bmQR.width = qrCurr.mcPlaceholder.width;
+                bmQR.height = qrCurr.mcPlaceholder.width;
+                qrCurr.mcPlaceholder.addChild(bmQR);
+                qrCurr.tfAddress.text = httpCurr;
             }
-            ui.tfIP.text = tf;
         }
 
         // Convenience - hit enter in port to start up

@@ -2,6 +2,8 @@ package com.pingnak
 {
     import flash.events.*;
     import flash.display.*;
+    import flash.text.*;
+    import flash.geom.*;
     import flash.utils.*;
 
 /*    
@@ -53,6 +55,15 @@ package com.pingnak
 */    
     /**
      * Class to encapsulate user interface elements between server and client
+     *
+     * This is more 'stand alone' than the generic Layer from which it derives.  
+     * We draw the UI layer separately because it is infrequently refreshed, and 
+     * will generally be higher resolution than the game layers are, to display
+     * more legible text.
+     *
+     * We don't synthesize and dispatch events to the native controls, because
+     * that won't work.  Implements focus and events internally, to run the UI
+     * from more basic elements.
     **/
     public class UILayer extends Layer
     {
@@ -97,13 +108,57 @@ package com.pingnak
         
         /** Alignment for UI */
         protected var alignment : String;
+
+        /** UI template */
+        protected var uiCurr : MovieClip;
         
+        /** Bounding box */
+        protected var bounds : Rectangle;
         
+        /** State handler */
+        protected var fsm : FSM;
+        
+        /** Set to send fresh frames to app */
+        protected var _dirty : int;
+
+        /** Which control has keyboard focus: Only initialized controls get any */
+        protected var focus : DisplayObject;
+        
+        /** Array of potential focus targets, sorted top->bottom, left->right */
+        protected var aFocus : Array;
+        
+        /** Mark animation as dirty */
+        public function set dirty(frames:int):void  
+        {
+CONFIG::DEBUG { debug.Assert( 0 < frames ); }
+            _dirty = Math.max(_dirty,frames); 
+            fsm.state = "Playing";
+        }
+
+        /** Find out how many dirty frames are left */
+        public function get dirty():int             { return _dirty; }
+        
+        /**
+         * @param id ID of layer, to give to client
+         * @param cb Client bundle to send images back to
+         * @param bounds Bounding box
+        **/
         public function UILayer( id : String, cb : ClientBundle )
         {
             super( id, cb, WorkerPackData.bPNG | WorkerPackData.bTransparent | WorkerPackData.bDelta | WorkerPackData.bMinimum | WorkerPackData.bBase64 )
             this.cb = cb;
-            smOperation = new FSMDObj(this);
+            fsm = new FSM(this);
+            Size(bounds);
+        }
+        
+        /**
+         * Client window has changed shape/orientation.  Change layout
+         * @param bounds Bounding box
+        **/
+        public function Size( bounds : Rectangle ) : void
+        {
+            this.bounds = bounds;
+            dirty = 1;
         }
         
         /**
@@ -113,59 +168,198 @@ package com.pingnak
         **/
         public function Show( mc:MovieClip, align:String="CENTER" ):void
         {
+            Hide();
+            // Don't design interfaces that animate all the time.  It's expensive
+            // to make and send and display high resolution imagery.
+            MCE.StopTree(mc);
             uiCurr = mc;
             alignment = align;
-            mc.stop();
+            Size(bounds);
         }
 
-        /**
-         * Client window shape/orientation update
-         * @param clientWidth   Size of client window
-         * @param clientHeight  Size of client window
-         * @param align Optionally changle alignment
-        **/
-        public function SetPos( clientWidth:uint, clientHeight:uint, align:String=null ):void
-        {
-            if( null != align )
-                alignment = align;
-        }
+        /*
+            High level control interface.  
+            
+            We don't want particularly complex controls or interactions.  
+            
+            Just enough to get us by.  By keeping this simple, we can let the
+            class do the housekeeping, and keep the app code a little cleaner.  
+        */
         
         /**
-         * Client touch/click input
-         * @param mx Mouse/tap x position
-         * @param my Mouse/tap y position
-         * @return true if handled
-        **/
-        public function Click( mx : Number, my : Number ) : Boolean
-        {
-        }
-
-        /**
-         * Client key input
-         * @param code Key code
-         * @param my Mouse/tap y position
-         * @return true if handled
-        **/
-        public function Key( code : uint ) : Boolean
-        {
-        }
-        
-        /**
-         * Clean up UI
+         * Show a new UI, or exchange UI
+         * @param mc A MovieClip of the UI made in Flash 
+         * @param align Where to attach the interface to the game
         **/
         public function Hide():void
         {
-            mc = null;
+            _dirty = 0;
+            fsm.state = FSM.IDLE;
+            if( null == uiCurr )
+                return;
+            aFocus = new Array();
             uiCurr = null;
-            // Tell client to hide
+        }
+
+        /**
+         * Set a MovieClip within uiCurr to a given frame/label
+         * @return MovieClip 
+        **/
+        public function SetMovieClip( id : String, label : * ) : MovieClip
+        {
+            var mc : MovieClip = utils.DObjFindPath( uiCurr, id ) as MovieClip;
+CONFIG::DEBUG { debug.Assert( MCE.HasLabel( mc, label ) ); }
+            if( null == mc )
+                return null;
+            mc.gotoAndStop(label);
+            return mc;
+        }
+
+        /**
+         * Play a labeled sequence within MovieClip once, and stop
+         * @return MovieClip 
+        **/
+        public function PlayMovieClip( id : String, label : * ) : MovieClip
+        {
+            var mc : MovieClip = utils.DObjFindPath( uiCurr, id ) as MovieClip;
+CONFIG::DEBUG { debug.Assert( MCE.HasLabel( mc, label ) ); }
+            if( null == mc )
+                return null;
+            MCE.Enable(mc);
+            MCE.PlayLabel( mc, label );
+            mc.gotoAndStop(label);
+            return mc;
         }
         
         /**
-         * Render an update, then send to client
+         * Configure a button in our UI
+         *
+         * @param id Search for a DisplayObject of this name, with 'idle,click' frame labels/animations
+         * @param cbClick(id) Notification for click; receives name of object (called AFTER click animation played)
+         * @return MovieClip button 
         **/
-        protected function Refresh():void
+        public function SetButton( id : String, cbClick : Function ) : MovieClip
         {
+            var mc : MovieClip = utils.DObjFindPath( uiCurr, id ) as MovieClip;
+CONFIG::DEBUG { debug.Assert( MCE.HasLabel( mc, "idle" ) && MCE.HasLabel( mc, "click" ) ); }
+            if( null == mc )
+                return null;
+                
+            return mc;
         }
 
+        /**
+         * Configure a check button in our UI.  This also implements tabs and 
+         * combo boxes.  The difference is only in art/presentation.
+         *
+         * @param id Search for a DisplayObject of this name, with 'off,on,click' frame labels/animations
+         * @param cbClick(id) Notification for click/change; receives name of object
+         * @param aRadio Optional array to make this part of a 'radio' button list
+         * @return MovieClip button
+        **/
+        public function SetCheck( id : String, cbClick : Function, aRadio : Array = null ) : MovieClip
+        {
+            var mc : MovieClip = utils.DObjFindPath( uiCurr, id ) as MovieClip;
+CONFIG::DEBUG { debug.Assert( MCE.HasLabel( mc, "off" ) && MCE.HasLabel( mc, "on" ) && MCE.HasLabel( mc, "click" ) ); }
+            if( null == mc )
+                return null;
+                
+            return mc;
+        }
+
+        /**
+         * Get state of check button
+         *
+         * @param id Search for a DisplayObject of this name, with 'off,on,click' frame labels/animations
+         * @return True if 'on', false if 'off'
+        **/
+        public function GetCheck( id : String ) : Boolean
+        {
+            var mc : MovieClip = utils.DObjFindPath( uiCurr, id ) as MovieClip;
+CONFIG::DEBUG { debug.Assert( null != mc ); }
+            return null != mc && "off" != mc.currentLabel; 
+        }
+        
+        /**
+         * Set text in an EDITABLE text field
+         *
+         * Editability is EMULATED on TextField; we can't pass the key events to 
+         * it, as if the user pressed them.  This needs to implement the 
+         *
+         * @param id Search for a DisplayObject of this name
+         * @param text Text to set TF to display.  
+         * @param cbChanged(id) An optional callback to be notified of     
+         * @return TextField, should you wish more control
+        **/
+        public function SetEdit( id : String, text : String, cbChanged : Function = null ) : TextField
+        {
+            var tf : TextField = utils.DObjFindPath( uiCurr, id ) as TextField;
+CONFIG::DEBUG { debug.Assert( null != tf ); }
+            if( null == tf )
+                return null;
+            tf.text = text;
+            return tf; 
+        }
+
+        /**
+         * Set text in a text field
+         * @param id Search for a DisplayObject of this name
+         * @param text Text to set TF to display.  May contain simplified html.
+         * @return TextField, should you wish more control
+        **/
+        public function SetText( id : String, text : String ) : TextField
+        {
+            var tf : TextField = utils.DObjFindPath( uiCurr, id ) as TextField;
+CONFIG::DEBUG { debug.Assert( null != tf ); }
+            if( null == tf )
+                return null;
+            tf.htmlText = text;
+            return tf; 
+        }
+
+        /**
+         * Get text from editable TextField
+         * @param id Search for a TextField of this name
+         * @return TextField.text 
+        **/
+        public function GetText( id : String ) : String
+        {
+            var tf : TextField = utils.DObjFindPath( uiCurr, id ) as TextField;
+CONFIG::DEBUG { debug.Assert( null != tf ); }
+            if( null == tf )
+                return "";
+            return tf.text; 
+        }
+        
+        /**
+         * Receive key codes from client; tab/navigate/dispatch to controls
+        **/
+        override public function Key( frame : uint, aParams : Array ) : Boolean
+        {
+            return super.Key(frame, aParams );
+        }
+
+        /**
+         * Receive 'Mouse click' from client; dispatch to controls
+        **/
+        override public function Click( frame : int, ptio : Point, shift:Boolean, ctrl:Boolean ) : DisplayObject
+        {
+            return super.Click(frame, ptio, shift, ctrl );
+        }
+        
+        /**
+         * State to generate 
+        **/
+        public function Playing() : void
+        {
+            if( 0 >= _dirty-- )
+            {
+                _dirty = 0;
+                fsm.state = FSM.IDLE;
+                return;
+            }
+            
+        }
+        
     }
 }
