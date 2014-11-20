@@ -9,6 +9,7 @@ package com.BugTest
     import flash.display.*;
     import flash.text.*;
     import flash.media.*;
+    import flash.ui.*;
     import flash.filters.*;
 
     import flash.desktop.NativeApplication; 
@@ -251,14 +252,13 @@ package com.BugTest
             }
         }
 
+
         // Convenience - hit enter in port to start up
         private function HitEnter(event:KeyboardEvent):void
         {
             UpdateIPList();
-            // if the key is ENTER
-            if(13 == event.charCode)
+            if(Keyboard.ENTER == event.charCode)
             {
-               // your code here
                 GoButton();
             }
         }
