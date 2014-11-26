@@ -130,6 +130,7 @@ CONFIG::DEBUG { debug.Assert( stopFunc is Function ); }
         public function set state(idFunc : String) : void
         { 
 CONFIG::DEBUG { debug.Trace( "state:", this, fsm_this, fsm_state, "->", idFunc ); }
+//CONFIG::DEBUG { debug.TraceStack(); }
 CONFIG::DEBUG { debug.Assert( IDLE == idFunc || fsm_this[idFunc] is Function ); }
             var oldState : String = fsm_state;
             fsm_state = idFunc;

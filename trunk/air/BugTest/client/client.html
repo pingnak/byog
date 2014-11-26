@@ -1,5 +1,15 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en" >
+<head>
+<meta content="utf-8" http-equiv="encoding">
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+<!-- IE evil http://technet.microsoft.com/en-us/library/dn321432.aspx -->
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<!-- iOS evil https://developer.apple.com/library/ios/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
     Classic, Dumb Raster Terminal Implementation - for modern browsers
     
@@ -15,9 +25,9 @@
     but hopefully they won't change enough to break this implementation.
     
     Generally speaking, I've tried to keep this simple, for a given value of 'simple'.
-    
+
     There are no external dependencies for the client.  What you see here is all of it.
-    
+
     The Server cleans comments, trace/assert, etc. and extra white space up in 
     release mode.  In that mode, looking at the client, it's a few, really long 
     lines with no code or xml comments.
@@ -41,17 +51,8 @@
     * My old C habits make me want to enumerate and make a binary protocol, but
     javascript would just make that a mess.
 -->
-<head>
-<title>%TITLE%</title>
-<meta charset="UTF-8">
-<meta NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
-<!-- IE evil http://technet.microsoft.com/en-us/library/dn321432.aspx -->
-<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-<!-- iOS evil https://developer.apple.com/library/ios/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="apple-touch-icon" href="favicon.png">
+<title>%TITLE%</title>
 <!--
     Debug console helper 
     Open http://jsconsole.com/
@@ -352,7 +353,7 @@ function WebSockSendDelay(str,delay)
 {
     setTimeout(SlightDelay,delay);
     function SlightDelay() 
-    { 
+    {
         WebSockSendStr(str); 
     }
 }
@@ -901,9 +902,8 @@ function HandleWebSockMessageTxt( str )
        that the answer isn't 'faked', to trigger bugs.
     */ 
     case "derp":
-        trace(str);
         WebSockSendStr(str);
-        //WebSockSendDelay(str,100);
+        //WebSockSendDelay(str,10);
         break;
 
     case "uion":
