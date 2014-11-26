@@ -238,20 +238,12 @@ package com.BugTest
         {
             if( Render() )
             {   // Once a frame has been rendered, wait for client to get it
-                fsm.state = FSM.IDLE;
-                SendDerp( "FirstFrameReceived" );
+                WSSendText("uion");
+                fsm.state = "Playing";
+                Playing();
             }
         }
 
-        /**
-         * Client received first frame of game.  Turn on display.
-        **/
-        public function FirstFrameReceived() : void
-        {
-            WSSendText("uion");
-            fsm.state = "Playing";
-            Playing();
-        }
         
         /**
          * This is where airplane refresh eventually needs to go
@@ -413,6 +405,7 @@ package com.BugTest
             var key : String = (derpSeq + Math.random()).toFixed(4);
             derpLut[key] = obj;
             var msg : String = "derp,"+key;
+trace("SendDerp:",msg,obj);
             WSSendText(msg);
         }
 
@@ -426,6 +419,7 @@ package com.BugTest
             // We expose nothing but a uniquely generated sequential+random 
             // identifier to look up the key.  In this case, state machine state.
             //
+trace("ReceiveDerp:",obj);
             fsm.state = obj as String;
         }
 

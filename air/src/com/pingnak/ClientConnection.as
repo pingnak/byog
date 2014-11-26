@@ -763,7 +763,6 @@ CONFIG::DIKEIN {
         internal function WSReceived(e:ProgressEvent) : void
         {
             socket.readBytes(message, message.length, socket.bytesAvailable );
-            //message.position = 0;    
             //Trace("DUMP\n"+debug.DumpHex(message));
             if( message.length >= 2 )
             {
