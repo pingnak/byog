@@ -171,6 +171,40 @@ package com.pingnak
         public function Address() : String { return my_ip; }
         public function Port() : int { return port; }
 
+        // Figure out if it's a real address
+        private static function PrioritizeAddress( addr : String ) : Boolean
+        {
+            // The various common, 'local' IP addresses
+            const priorities : Array = [
+                "fd",
+                "10.",
+                "192.168.",
+                "172.16.",
+                "172.17.",
+                "172.18.",
+                "172.19.",
+                "172.20.",
+                "172.21.",
+                "172.22.",
+                "172.23.",
+                "172.24.",
+                "172.25.",
+                "172.26.",
+                "172.27.",
+                "172.28.",
+                "172.29.",
+                "172.30.",
+                "172.31.",
+            ];
+            var i : int;
+            for( i = 0; i < priorities.length; ++i )
+            {
+                if( 0 == addr.indexOf( priorities[i] ) )
+                    return true;
+            }
+            return false;
+        }
+        
         /**
          * Get a list of available IP addresses
         **/
@@ -183,6 +217,7 @@ package com.pingnak
             var result : Array = [];
             var i : int;
             var j : int;
+                        
             //Get available interfaces
             for ( i; i < interfaces.length; i++)
             {
@@ -196,7 +231,12 @@ package com.pingnak
                     // Exculde loopback, and ipV6 addresses, unless asked for
                     if( address.address != "127.0.0.1" && 
                         ((ipV6 && address.address != "::1") || -1 == address.address.indexOf(":")) )
-                        result.push(address);
+                    {
+                        if( PrioritizeAddress(address.address) )
+                            result.unshift(address);
+                        else
+                            result.push(address);
+                    }
                 }
             }
             return result;

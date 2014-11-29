@@ -217,7 +217,7 @@ package com.BugTest
             while( 0 != mcQR.numChildren )
                 mcQR.removeChildAt(0);
 
-            var aip : Array = Server.GetInterfaces();
+            var aip : Array = Server.GetInterfaces(false);
             var tf : String = "";
             var httpCurr : String;
             var curr : InterfaceAddress;
@@ -239,7 +239,7 @@ package com.BugTest
                 }
                 tf + httpCurr + (0<aip.length?", ":"")
                 
-                const QR_SEP : int = 32;
+                const QR_SEP : int = 16;
                 qr.encode(httpCurr);
                 bmQR = new Bitmap(qr.bitmapData);
                 qrCurr = new QRInfo();

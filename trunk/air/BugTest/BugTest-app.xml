@@ -33,7 +33,7 @@
         <minimizable>false</minimizable>
         <resizable>true</resizable>
         <width>980</width>
-        <height>685</height>
+        <height>942</height>
     </initialWindow>
     <customUpdateUI>false</customUpdateUI>
     <allowBrowserInvocation>false</allowBrowserInvocation>
